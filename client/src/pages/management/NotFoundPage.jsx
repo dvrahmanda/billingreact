@@ -1,0 +1,1 @@
+import React from 'react';import {Link} from 'react-router-dom';export default function NotFoundPage(){return <div className="card empty-state"><strong>Halaman tidak ditemukan</strong><p style={{marginBottom:12}}>Alamat yang dibuka tidak tersedia.</p><Link className="btn btn-primary" to="/dashboard">Kembali ke Dashboard</Link></div>}

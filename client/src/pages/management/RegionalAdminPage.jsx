@@ -1,0 +1,19 @@
+import React,{useEffect,useState} from 'react';
+import { apiGet,apiPost,apiPut } from '../../services/api';
+import DataTable from '../../components/common/DataTable';
+import Badge from '../../components/common/Badge';
+import Button from '../../components/common/Button';
+import Modal from '../../components/common/Modal';
+import { formatDateIndo } from '../../utils/formatters';
+
+const blank={username:'',nama_lengkap:'',wilayah:'SALAM',nomor_telepon:'',password:'',status:'aktif'};
+export default function RegionalAdminPage(){
+ const[rows,setRows]=useState([]),[open,setOpen]=useState(false),[form,setForm]=useState(blank),[editId,setEditId]=useState(null),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
+ const load=()=>{setLoading(true);apiGet('/admins').then(r=>setRows(r.data||[])).catch(e=>alert(e.friendlyMessage||'Admin gagal dimuat.')).finally(()=>setLoading(false))};useEffect(load,[]);
+ const edit=row=>{setEditId(row.id);setForm({...blank,...row,password:''});setOpen(true)};
+ const submit=async()=>{setBusy(true);try{if(editId)await apiPut(`/admins/${editId}`,form);else await apiPost('/admins',form);setOpen(false);setForm(blank);setEditId(null);load()}catch(e){alert(e.friendlyMessage||'Admin gagal disimpan.')}finally{setBusy(false)}};
+ const cols=[{header:'Nama',accessor:'nama_lengkap'},{header:'Username',accessor:'username'},{header:'Wilayah',accessor:'wilayah'},{header:'Status',accessor:r=><Badge variant={r.status==='aktif'?'success':'danger'}>{r.status}</Badge>},{header:'Dibuat',accessor:r=>formatDateIndo(r.created_at)},{header:'Aksi',accessor:r=><Button variant="outline" size="sm" onClick={()=>edit(r)}>Edit / Status</Button>}];
+ return <div className="page-container"><div className="page-header"><div><h1>Admin Wilayah</h1><p>Kelola akun, wilayah akses, dan status Admin Wilayah.</p></div><Button onClick={()=>{setEditId(null);setForm(blank);setOpen(true)}}>Tambah Admin</Button></div><DataTable columns={cols} data={rows} loading={loading}/>
+ {open&&<Modal title={editId?'Edit Admin Wilayah':'Tambah Admin Wilayah'} onClose={()=>setOpen(false)}><div className="card-body"><div className="form-grid"><div className="form-group"><label className="form-label">Nama Lengkap</label><input className="form-control" value={form.nama_lengkap||''} onChange={e=>setForm({...form,nama_lengkap:e.target.value})}/></div><div className="form-group"><label className="form-label">Username</label><input className="form-control" disabled={Boolean(editId)} value={form.username||''} onChange={e=>setForm({...form,username:e.target.value})}/></div><div className="form-group"><label className="form-label">Wilayah</label><select className="form-control" value={form.wilayah} onChange={e=>setForm({...form,wilayah:e.target.value})}>{['BARAN','GUNUNGMANUK','NGASEMAYU','SALAM','TROSARI','WADUK'].map(w=><option key={w}>{w}</option>)}</select></div><div className="form-group"><label className="form-label">Nomor Telepon</label><input className="form-control" value={form.nomor_telepon||''} onChange={e=>setForm({...form,nomor_telepon:e.target.value})}/></div><div className="form-group"><label className="form-label">{editId?'Password baru (opsional)':'Password'}</label><input type="password" className="form-control" value={form.password||''} onChange={e=>setForm({...form,password:e.target.value})}/></div>{editId&&<div className="form-group"><label className="form-label">Status</label><select className="form-control" value={form.status} onChange={e=>setForm({...form,status:e.target.value})}><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select></div>}</div><div className="header-actions" style={{justifyContent:'flex-end',marginTop:16}}><Button variant="outline" onClick={()=>setOpen(false)}>Batal</Button><Button disabled={busy} onClick={submit}>{busy?'Menyimpan...':'Simpan'}</Button></div></div></Modal>}
+ </div>;
+}

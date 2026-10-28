@@ -1,0 +1,9 @@
+import React,{useEffect,useState} from 'react';
+import { Link } from 'react-router-dom';
+import { apiGet } from '../../services/api';
+import DataTable from '../../components/common/DataTable';
+import Badge,{statusVariant} from '../../components/common/Badge';
+import { formatDateIndo,labelStatus } from '../../utils/formatters';
+export default function ComplaintListPage(){const[rows,setRows]=useState([]),[status,setStatus]=useState('');const load=()=>apiGet(`/complaints?status=${status}`).then(r=>setRows(r.data||[])).catch(e=>alert(e.friendlyMessage||'Complain gagal dimuat.'));useEffect(()=>{load()},[]);
+ const cols=[{header:'No. Tiket',accessor:'nomor_tiket'},{header:'Pelanggan',accessor:r=><div><div className="table-title">{r.nama}</div><div className="table-sub">{r.id_pelanggan} · {r.alamat}</div></div>},{header:'Kategori',accessor:r=>labelStatus(r.kategori)},{header:'Tanggal',accessor:r=>formatDateIndo(r.created_at,true)},{header:'Teknisi',accessor:r=>r.teknisi_nama||'-'},{header:'Status',accessor:r=><Badge variant={statusVariant(r.status)}>{labelStatus(r.status)}</Badge>},{header:'Aksi',accessor:r=><Link className="btn btn-outline btn-sm" to={`/complaints/${r.id}`}>Detail</Link>}];
+ return <div className="page-container"><div className="page-header"><div><h1>Complain Pelanggan</h1><p>Verifikasi gangguan, penugasan teknisi, dan monitoring sampai selesai.</p></div></div><div className="filter-bar"><select className="form-control" style={{width:230}} value={status} onChange={e=>setStatus(e.target.value)}><option value="">Semua Status</option>{['menunggu_verifikasi','terverifikasi','ditugaskan','menuju_lokasi','dalam_penanganan','menunggu_material','penanganan_selesai','closed','ditolak'].map(s=><option key={s} value={s}>{labelStatus(s)}</option>)}</select><button className="btn btn-primary" onClick={load}>Terapkan</button></div><DataTable columns={cols} data={rows}/></div>;}

@@ -1,0 +1,21 @@
+import React,{useEffect,useState} from 'react';
+import { Link } from 'react-router-dom';
+import { apiDownload,apiGet,apiPost } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import DataTable from '../../components/common/DataTable';
+import Badge,{statusVariant} from '../../components/common/Badge';
+import Button from '../../components/common/Button';
+import { formatRupiah,formatDateIndo } from '../../utils/formatters';
+
+export default function BillListPage(){
+ const{user}=useAuth();const[rows,setRows]=useState([]),[loading,setLoading]=useState(true),[status,setStatus]=useState(''),[period,setPeriod]=useState(''),[wilayah,setWilayah]=useState('all'),[page,setPage]=useState(1),[pages,setPages]=useState(1),[generating,setGenerating]=useState(false);
+ const load=async(nextPage=page)=>{setLoading(true);const params=new URLSearchParams({status,periode:period,page:String(nextPage),page_size:'25'});if(user?.role==='superadmin')params.set('wilayah',wilayah);try{const result=await apiGet(`/billings?${params}`);setRows(result.data||[]);setPage(result.pagination?.page||nextPage);setPages(result.pagination?.pages||1)}catch(e){alert(e.friendlyMessage||'Tagihan gagal dimuat.')}finally{setLoading(false)}};
+ useEffect(()=>{load(1)},[]);
+ const generate=async()=>{if(!confirm(`Buat tagihan periode ${period||'bulan berjalan'} untuk pelanggan aktif? Tagihan yang sudah ada tidak akan digandakan.`))return;setGenerating(true);try{const result=await apiPost('/billings/generate',{periode:period||undefined,wilayah:user?.role==='superadmin'&&wilayah!=='all'?wilayah:undefined});alert(`${result.data.created} tagihan dibuat; ${result.data.skipped} tagihan sudah ada.`);load(1)}catch(e){alert(e.friendlyMessage||'Pembuatan tagihan gagal.')}finally{setGenerating(false)}};
+ const cols=[{header:'Invoice',accessor:r=>r.nomor_invoice||`INV-${r.id}`},{header:'Pelanggan',accessor:r=><div><div className="table-title">{r.nama_snapshot||r.nama}</div><div className="table-sub">{r.id_pelanggan_snapshot||r.id_pelanggan} · {r.alamat_snapshot||r.alamat}</div></div>},{header:'Periode',accessor:r=>formatDateIndo(r.periode)},{header:'Nominal',accessor:r=>formatRupiah(r.nominal_tagihan||r.tagihan)},{header:'Jatuh Tempo',accessor:r=>formatDateIndo(r.tanggal_jatuh_tempo)},{header:'Status',accessor:r=><Badge variant={statusVariant(r.status_bayar)}>{r.status_bayar}</Badge>},{header:'Aksi',accessor:r=><Link className="btn btn-outline btn-sm" to={`/billings/${r.id}`}>Detail</Link>}];
+ const filters=new URLSearchParams({status,periode:period});if(user?.role==='superadmin')filters.set('wilayah',wilayah);
+ return <div className="page-container"><div className="page-header"><div><h1>Daftar Tagihan</h1><p>Riwayat tagihan per periode, pembayaran, dan tunggakan.</p></div><div className="header-actions"><Button variant="outline" onClick={()=>apiDownload(`/billings/export?${filters}`,'tagihan.xlsx').catch(e=>alert(e.friendlyMessage||'Export gagal.'))}>Export Excel</Button><Button disabled={generating} onClick={generate}>{generating?'Membuat...':'Buat Tagihan Periode'}</Button></div></div>
+  <div className="filter-bar"><input aria-label="Periode tagihan" className="form-control" style={{width:170}} type="month" value={period} onChange={e=>setPeriod(e.target.value)}/><select className="form-control" style={{width:190}} value={status} onChange={e=>setStatus(e.target.value)}><option value="">Semua Status</option><option>Lunas</option><option>Belum Lunas</option></select>{user?.role==='superadmin'&&<select className="form-control" style={{width:190}} value={wilayah} onChange={e=>setWilayah(e.target.value)}><option value="all">Semua Wilayah</option>{['BARAN','GUNUNGMANUK','NGASEMAYU','SALAM','TROSARI','WADUK'].map(item=><option key={item}>{item}</option>)}</select>}<Button onClick={()=>load(1)}>Terapkan</Button></div>
+  <DataTable columns={cols} data={rows} loading={loading}/><div className="pagination-bar"><span>Halaman {page} dari {pages}</span><div><Button variant="outline" size="sm" disabled={page<=1||loading} onClick={()=>load(page-1)}>Sebelumnya</Button><Button variant="outline" size="sm" disabled={page>=pages||loading} onClick={()=>load(page+1)}>Berikutnya</Button></div></div>
+ </div>;
+}

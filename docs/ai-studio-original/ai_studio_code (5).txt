@@ -1,0 +1,122 @@
+import React, { useState, useEffect } from 'react';
+import { apiGet, apiPost } from '../../services/api';
+import DataTable from '../../components/common/DataTable';
+import Badge from '../../components/common/Badge';
+import Button from '../../components/common/Button';
+import Modal from '../../components/common/Modal';
+import { formatRupiah, formatDateIndo } from '../../utils/formatters';
+
+export default function ManualPaymentVerifyPage() {
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPay, setSelectedPay] = useState(null);
+  const [alasanTolak, setAlasanTolak] = useState('');
+  const [isRejectModal, setIsRejectModal] = useState(false);
+
+  useEffect(() => {
+    loadPendingPayments();
+  }, []);
+
+  const loadPendingPayments = async () => {
+    try {
+      setLoading(true);
+      const res = await apiGet('/payments/manual-pending');
+      setPayments(res.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprove = async (id) => {
+    if (!window.confirm('Verifikasi dan terima pembayaran ini? Tagihan akan otomatis lunas.')) return;
+    try {
+      await apiPost(`/payments/verify/${id}`, { action: 'approve' });
+      alert('Pembayaran berhasil diverifikasi.');
+      loadPendingPayments();
+    } catch (err) {
+      alert(err.message || 'Gagal memproses verifikasi.');
+    }
+  };
+
+  const handleReject = async () => {
+    if (!alasanTolak.trim()) {
+      alert('Wajib menyertakan alasan penolakan.');
+      return;
+    }
+    try {
+      await apiPost(`/payments/verify/${selectedPay.id}`, { action: 'reject', alasan: alasanTolak });
+      alert('Pembayaran telah ditolak.');
+      setIsRejectModal(false);
+      setAlasanTolak('');
+      setSelectedPay(null);
+      loadPendingPayments();
+    } catch (err) {
+      alert(err.message || 'Gagal memproses penolakan.');
+    }
+  };
+
+  const columns = [
+    { header: 'Order ID / No', accessor: 'order_id' },
+    { header: 'Pelanggan', accessor: (row) => (
+      <div>
+        <strong>{row.nama}</strong>
+        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{row.id_pelanggan} ({row.alamat})</div>
+      </div>
+    )},
+    { header: 'Periode', accessor: (row) => formatDateIndo(row.periode, false) },
+    { header: 'Nominal', accessor: (row) => formatRupiah(row.nominal_dibayar) },
+    { header: 'Bukti Transfer', accessor: (row) => (
+      <a href={`http://localhost:5000/${row.bukti_transfer}`} target="_blank" rel="noreferrer" className="text-link">
+        <i className="fas fa-image"></i> Lihat Bukti
+      </a>
+    )},
+    { header: 'Status', accessor: () => <Badge variant="warning">Menunggu Verifikasi</Badge> },
+    { header: 'Aksi', accessor: (row) => (
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <Button size="sm" variant="success" onClick={() => handleApprove(row.id)}>
+          <i className="fas fa-check"></i> Terima
+        </Button>
+        <Button size="sm" variant="danger" onClick={() => { setSelectedPay(row); setIsRejectModal(true); }}>
+          <i className="fas fa-xmark"></i> Tolak
+        </Button>
+      </div>
+    )}
+  ];
+
+  return (
+    <div className="page-container">
+      <div className="page-header">
+        <div>
+          <h2>Verifikasi Pembayaran Manual</h2>
+          <p>Daftar unggahan bukti transfer pelanggan yang menunggu konfirmasi admin.</p>
+        </div>
+      </div>
+
+      <DataTable columns={columns} data={payments} loading={loading} />
+
+      {isRejectModal && (
+        <Modal title="Tolak Pembayaran" onClose={() => setIsRejectModal(false)}>
+          <div style={{ padding: '16px' }}>
+            <p style={{ marginBottom: '12px' }}>
+              Anda akan menolak pembayaran dari <strong>{selectedPay?.nama}</strong> senilai {formatRupiah(selectedPay?.nominal_dibayar)}.
+            </p>
+            <label className="form-label">Alasan Penolakan (Wajib Diisi)</label>
+            <textarea
+              className="form-control"
+              rows="3"
+              placeholder="Contoh: Bukti buram, nominal tidak sesuai, rekening tujuan salah."
+              value={alasanTolak}
+              onChange={(e) => setAlasanTolak(e.target.value)}
+            ></textarea>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <Button variant="secondary" onClick={() => setIsRejectModal(false)}>Batal</Button>
+              <Button variant="danger" onClick={handleReject}>Konfirmasi Tolak</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,20 @@
+import React,{useEffect,useState} from 'react';
+import { apiGet } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import Card from '../../components/common/Card';
+import Badge from '../../components/common/Badge';
+
+export default function CustomerGeoMapPage(){
+ const{user}=useAuth();const[rows,setRows]=useState([]),[wilayah,setWilayah]=useState('all');
+ useEffect(()=>{apiGet(`/pppoe/map?wilayah=${encodeURIComponent(wilayah)}`).then(r=>setRows(r.data||[])).catch(e=>alert(e.friendlyMessage||'Peta pelanggan gagal dimuat.'))},[wilayah]);
+ const located=rows.filter(row=>Number.isFinite(Number(row.koordinat_x))&&Number.isFinite(Number(row.koordinat_y)));
+ const xs=located.map(row=>Number(row.koordinat_x)),ys=located.map(row=>Number(row.koordinat_y));
+ const minX=xs.length?Math.min(...xs):null,maxX=xs.length?Math.max(...xs):null,minY=ys.length?Math.min(...ys):null,maxY=ys.length?Math.max(...ys):null;
+ const padX=located.length?Math.max(0.005,(maxX-minX)*0.18):0,padY=located.length?Math.max(0.005,(maxY-minY)*0.18):0;
+ const mapUrl=located.length?`https://www.openstreetmap.org/export/embed.html?bbox=${minX-padX}%2C${minY-padY}%2C${maxX+padX}%2C${maxY+padY}&layer=mapnik`:null;
+ const position=row=>({left:`${10+(maxX===minX?50:(Number(row.koordinat_x)-minX)/(maxX-minX)*80)}%`,top:`${90-(maxY===minY?40:(Number(row.koordinat_y)-minY)/(maxY-minY)*80)}%`});
+ return <div className="page-container"><div className="page-header"><div><h1>Peta Persebaran Pelanggan</h1><p>Posisi marker dihitung dari koordinat pelanggan; warna menunjukkan PPPoE dan complain aktif. Pilih marker untuk membuka lokasi pada OpenStreetMap.</p></div>{user?.role==='superadmin'&&<select className="form-control" style={{width:190}} value={wilayah} onChange={e=>setWilayah(e.target.value)}><option value="all">Semua Wilayah</option>{['BARAN','GUNUNGMANUK','NGASEMAYU','SALAM','TROSARI','WADUK'].map(w=><option key={w}>{w}</option>)}</select>}</div>
+  <div className="two-col"><div className="map-canvas map-coordinate-canvas">{mapUrl?<iframe className="map-tiles" title="Peta OpenStreetMap pelanggan" src={mapUrl} loading="lazy" referrerPolicy="no-referrer"/>:<div className="map-grid"/>}{located.map((row,index)=><button type="button" key={row.id||index} title={`${row.nama} · ${row.alamat_lengkap||row.wilayah} · PPPoE ${row.status||'belum diketahui'}${row.complain_aktif?' · Complain aktif':''}`} onClick={()=>window.open(`https://www.openstreetmap.org/?mlat=${row.koordinat_y}&mlon=${row.koordinat_x}#map=17/${row.koordinat_y}/${row.koordinat_x}`,'_blank','noopener,noreferrer')} className={`map-pin ${row.status==='OFFLINE'?'offline':''} ${row.complain_aktif?'complaint':''}`} style={position(row)}><span>{index+1}</span></button>)}<div className="map-axis-label">Longitude {Number.isFinite(minX)?minX.toFixed(5):'-'} — {Number.isFinite(maxX)?maxX.toFixed(5):'-'}</div><div className="map-axis-label map-axis-y">Latitude {Number.isFinite(minY)?minY.toFixed(5):'-'} — {Number.isFinite(maxY)?maxY.toFixed(5):'-'}</div></div>
+  <Card title={`Lokasi Pelanggan (${located.length})`}>{located.slice(0,50).map((row,index)=><div key={row.id||index} className="info-item map-customer-row"><div className="map-customer-number">{index+1}</div><div style={{flex:1}}><div className="info-value">{row.nama}</div><div className="table-sub">{row.alamat_lengkap||row.wilayah} · {row.wilayah}</div><div className="table-sub">{row.koordinat_y}, {row.koordinat_x} · {row.username||'Belum terhubung'}</div><a className="table-sub" target="_blank" rel="noreferrer" href={`https://www.openstreetmap.org/?mlat=${row.koordinat_y}&mlon=${row.koordinat_x}#map=17/${row.koordinat_y}/${row.koordinat_x}`}>Buka lokasi</a></div><div className="map-status-stack"><Badge variant={row.status==='ONLINE'?'success':row.status==='OFFLINE'?'danger':'neutral'}>{row.status||'Tidak diketahui'}</Badge>{row.complain_aktif&&<Badge variant="warning">Complain</Badge>}</div></div>)}{!located.length&&<div className="empty-state"><strong>Belum ada koordinat</strong>Lengkapi koordinat pada profil pelanggan untuk menampilkan marker.</div>}</Card></div>
+ </div>;
+}

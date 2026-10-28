@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Life Media Pelanggan",
+    "slug": "billing-lifemedia-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": { "bundleIdentifier": "id.lifemedia.billing.customer" },
+    "android": { "package": "id.lifemedia.billing.customer" },
+    "plugins": [
+      "expo-secure-store",
+      ["expo-image-picker", { "photosPermission": "Life Media membutuhkan akses foto untuk bukti pembayaran dan laporan gangguan.", "cameraPermission": "Life Media membutuhkan kamera untuk mengambil bukti pembayaran dan foto gangguan." }]
+    ]
+  }
+}

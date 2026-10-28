@@ -1,0 +1,35 @@
+import React,{useEffect,useState} from 'react';
+import { Link,useParams } from 'react-router-dom';
+import { apiGet,apiOpenFile,apiPost,privateFileUrl } from '../../services/api';
+import Card from '../../components/common/Card';
+import Badge,{statusVariant} from '../../components/common/Badge';
+import DataTable from '../../components/common/DataTable';
+import PrivateImage from '../../components/common/PrivateImage';
+import Button from '../../components/common/Button';
+import { formatRupiah,formatDateIndo,labelStatus } from '../../utils/formatters';
+
+const tabs=['Profil','Tagihan','Riwayat Pembayaran','PPPoE','Complain','Foto / Dokumen'];
+
+export default function CustomerDetailPage(){
+ const {id}=useParams();const[data,setData]=useState(null);const[active,setActive]=useState('Profil');const[error,setError]=useState('');const[uploading,setUploading]=useState(false);
+ const load=()=>apiGet(`/customers/${id}`).then(r=>{setData(r.data);setError('')}).catch(e=>setError(e.friendlyMessage||'Data pelanggan gagal dimuat.'));
+ useEffect(()=>{setData(null);load()},[id]);
+ const uploadPhoto=async event=>{const file=event.target.files?.[0];if(!file)return;const form=new FormData();form.append('file',file);setUploading(true);try{await apiPost(`/customers/${id}/photo`,form);await load()}catch(e){alert(e.friendlyMessage||'Foto gagal diunggah.')}finally{setUploading(false);event.target.value=''}};
+ if(!data&&!error)return <div className="screen-center" style={{minHeight:350}}><div className="spinner"/></div>;
+ if(!data)return <div className="page-container"><div className="alert alert-danger">{error}</div><Link className="btn btn-secondary" to="/customers">Kembali ke pelanggan</Link></div>;
+ const history=data.tagihan_history||[],payments=data.payment_history||[],complaints=data.complaints||[];
+ const billCols=[{header:'Periode',accessor:r=>formatDateIndo(r.periode)},{header:'Invoice',accessor:r=>r.nomor_invoice||`INV-${r.id}`},{header:'Nominal',accessor:r=>formatRupiah(r.nominal_tagihan)},{header:'Jatuh Tempo',accessor:r=>formatDateIndo(r.tanggal_jatuh_tempo)},{header:'Status',accessor:r=><Badge variant={statusVariant(r.status_bayar)}>{r.status_bayar}</Badge>},{header:'Aksi',accessor:r=><Link className="btn btn-outline btn-sm" to={`/billings/${r.id}`}>Detail</Link>}];
+ const paymentCols=[{header:'Order ID',accessor:'order_id'},{header:'Periode',accessor:r=>formatDateIndo(r.periode)},{header:'Nominal Dibayar',accessor:r=>formatRupiah(r.nominal_dibayar)},{header:'Metode',accessor:r=>r.metode||r.tipe_pembayaran},{header:'Tanggal',accessor:r=>formatDateIndo(r.created_at,true)},{header:'Status',accessor:r=><Badge variant={statusVariant(r.status)}>{labelStatus(r.status)}</Badge>},{header:'Bukti',accessor:r=>r.bukti_transfer?<button className="btn btn-outline btn-sm" onClick={()=>apiOpenFile(privateFileUrl(r.bukti_transfer)).catch(e=>alert(e.friendlyMessage||'Bukti tidak dapat dibuka.'))}>Lihat</button>:'-'}];
+ const complaintCols=[{header:'Tiket',accessor:'nomor_tiket'},{header:'Kategori',accessor:r=>labelStatus(r.kategori)},{header:'Dibuat',accessor:r=>formatDateIndo(r.created_at,true)},{header:'Status',accessor:r=><Badge variant={statusVariant(r.status)}>{labelStatus(r.status)}</Badge>},{header:'Aksi',accessor:r=><Link className="btn btn-outline btn-sm" to={`/complaints/${r.id}`}>Detail</Link>}];
+ const coords=data.koordinat_y&&data.koordinat_x?`${data.koordinat_y},${data.koordinat_x}`:'';
+ return <div className="page-container"><div className="page-header"><div><h1>{data.nama}</h1><p>{data.id_pelanggan} · {data.alamat}</p></div><div className="header-actions"><Link className="btn btn-secondary" to={`/customers/${id}/edit`}>Edit Pelanggan</Link></div></div>
+  <div className="info-grid">{[['Status',<Badge variant={statusVariant(data.status_pelanggan)}>{data.status_pelanggan}</Badge>],['Paket',data.paket],['Tarif',formatRupiah(data.tarif_langganan)],['WhatsApp',data.nomor_pelanggan||'-'],['PPPoE',data.pppoe_user||'Belum terhubung'],['Status PPPoE',<Badge variant={statusVariant(data.pppoe_status)}>{data.pppoe_status||'Belum Terhubung'}</Badge>]].map(([label,value])=><div className="info-item" key={label}><div className="info-label">{label}</div><div className="info-value">{value}</div></div>)}</div>
+  <div className="tab-strip" role="tablist">{tabs.map(tab=><button key={tab} className={`tab-button ${active===tab?'active':''}`} onClick={()=>setActive(tab)}>{tab}</button>)}</div>
+  {active==='Profil'&&<div className="two-col"><Card title="Profil Pelanggan"><div className="info-grid" style={{gridTemplateColumns:'1fr 1fr'}}>{[['Nama KTP',data.nama_ktp],['NIK',data.nik],['Tanggal Aktif',formatDateIndo(data.tanggal_daftar||data.tanggal_aktif)],['Nomor WhatsApp',data.nomor_pelanggan],['Alamat',data.alamat_lengkap||data.alamat],['Koordinat',coords||'-']].map(([label,value])=><div className="info-item" key={label}><div className="info-label">{label}</div><div className="info-value">{value||'-'}</div></div>)}</div>{coords&&<a className="btn btn-outline btn-sm" target="_blank" rel="noreferrer" href={`https://www.openstreetmap.org/?mlat=${data.koordinat_y}&mlon=${data.koordinat_x}#map=17/${data.koordinat_y}/${data.koordinat_x}`}>Buka lokasi</a>}</Card><Card title="Ringkasan Tagihan"><div className="info-value">{history.filter(x=>x.status_bayar!=='Lunas').length} belum lunas</div><div className="table-sub">{formatRupiah(history.filter(x=>x.status_bayar!=='Lunas').reduce((a,x)=>a+Number(x.nominal_tagihan||0),0))} tunggakan tercatat</div><Link to="/billings" className="btn btn-outline btn-sm" style={{marginTop:12}}>Lihat semua tagihan</Link></Card></div>}
+  {active==='Tagihan'&&<Card title="Riwayat Tagihan"><DataTable columns={billCols} data={history}/></Card>}
+  {active==='Riwayat Pembayaran'&&<Card title="Riwayat Pembayaran"><DataTable columns={paymentCols} data={payments}/></Card>}
+  {active==='PPPoE'&&<Card title="Koneksi PPPoE"><div className="info-grid">{[['Username',data.pppoe_user],['IP',data.pppoe_ip],['MAC',data.pppoe_mac],['Router',data.pppoe_router],['Status',data.pppoe_status],['Wilayah',data.alamat]].map(([label,value])=><div className="info-item" key={label}><div className="info-label">{label}</div><div className="info-value">{value||'-'}</div></div>)}</div><Link to="/network/monitoring" className="btn btn-outline btn-sm" style={{marginTop:12}}>Monitoring PPPoE</Link></Card>}
+  {active==='Complain'&&<Card title="Riwayat Complain"><DataTable columns={complaintCols} data={complaints}/></Card>}
+  {active==='Foto / Dokumen'&&<Card title="Dokumen Pelanggan"><div className="form-group"><label className="form-label">Foto Rumah</label><input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={uploading}/><div className="table-sub">JPG, PNG, WEBP maksimal 5 MB.</div></div><PrivateImage path={data.foto_rumah} alt={`Foto rumah ${data.nama}`} style={{maxWidth:'100%',maxHeight:420,borderRadius:12,marginTop:12}}/><div className="info-item" style={{marginTop:14}}><div className="info-label">Catatan</div><div className="info-value">{data.catatan||'-'}</div></div></Card>}
+ </div>;
+}

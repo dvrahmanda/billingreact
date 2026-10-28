@@ -1,0 +1,1 @@
+const r=require('express').Router(),c=require('../controllers/analyticsController'),auth=require('../middleware/auth'),{requireAdmin,enforceWilayahScope}=require('../middleware/roleScope');r.use(auth,requireAdmin,enforceWilayahScope);r.get('/',c.index);module.exports=r;

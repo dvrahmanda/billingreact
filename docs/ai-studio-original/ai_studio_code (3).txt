@@ -1,0 +1,101 @@
+import React from 'react';
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import './layout.css';
+
+export default function Sidebar() {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'superadmin';
+
+  return (
+    <aside className="app-sidebar">
+      <div className="sidebar-brand">
+        <div className="brand-logo">
+          <span className="logo-dot"></span>
+          <h2>Life Media</h2>
+        </div>
+        <span className="brand-badge">
+          {isSuperAdmin ? 'SUPER ADMIN' : `WIL. ${user?.wilayah}`}
+        </span>
+      </div>
+
+      <nav className="sidebar-nav">
+        <div className="nav-section-title">UTAMA</div>
+        <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-chart-pie"></i>
+          <span>Dashboard</span>
+        </NavLink>
+
+        <div className="nav-section-title">BILLING & PELANGGAN</div>
+        <NavLink to="/customers" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-users"></i>
+          <span>Data Pelanggan</span>
+        </NavLink>
+        <NavLink to="/billings" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-file-invoice-dollar"></i>
+          <span>Daftar Tagihan</span>
+        </NavLink>
+        <NavLink to="/payments" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-receipt"></i>
+          <span>Riwayat Pembayaran</span>
+        </NavLink>
+        <NavLink to="/payments/matching" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-check-double"></i>
+          <span>Pengecekan Pembayaran</span>
+        </NavLink>
+
+        <div className="nav-section-title">JARINGAN PPPoE</div>
+        <NavLink to="/network/monitoring" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-network-wired"></i>
+          <span>Monitoring PPPoE</span>
+        </NavLink>
+        <NavLink to="/network/mapping" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-link"></i>
+          <span>Mapping PPPoE</span>
+        </NavLink>
+        <NavLink to="/network/map" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-map-location-dot"></i>
+          <span>Peta Persebaran</span>
+        </NavLink>
+
+        <div className="nav-section-title">LAYANAN GANGGUAN</div>
+        <NavLink to="/complaints" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-headset"></i>
+          <span>Complain Pelanggan</span>
+        </NavLink>
+        <NavLink to="/technicians/monitoring" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-user-gear"></i>
+          <span>Monitoring Teknisi</span>
+        </NavLink>
+
+        <div className="nav-section-title">LAPORAN & ANALISIS</div>
+        <NavLink to="/reports/financial" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-file-lines"></i>
+          <span>Laporan Keuangan</span>
+        </NavLink>
+        <NavLink to="/analytics" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <i className="fas fa-chart-line"></i>
+          <span>Analisis Pembayaran</span>
+        </NavLink>
+
+        {isSuperAdmin && (
+          <>
+            <div className="nav-section-title">MANAJEMEN SISTEM</div>
+            <NavLink to="/management/admins" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <i className="fas fa-user-shield"></i>
+              <span>Admin Wilayah</span>
+            </NavLink>
+            <NavLink to="/management/technicians" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <i className="fas fa-toolbox"></i>
+              <span>Data Teknisi</span>
+            </NavLink>
+            <NavLink to="/management/configs" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <i className="fas fa-sliders"></i>
+              <span>Config & WhatsApp</span>
+            </NavLink>
+          </>
+        )}
+      </nav>
+    </aside>
+  );
+}

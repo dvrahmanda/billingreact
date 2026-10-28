@@ -1,0 +1,16 @@
+{
+  "name": "billing-lifemedia",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install && npm --prefix mobile-customer install && npm --prefix mobile-technician install",
+    "dev": "concurrently \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "mobile:customer": "npm --prefix mobile-customer start",
+    "mobile:technician": "npm --prefix mobile-technician start",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+server/uploads/*
+!server/uploads/bukti_transfer/demo-bukti.jpg
+!server/uploads/bukti_transfer/.gitkeep
+!server/uploads/foto_complain/.gitkeep
+!server/uploads/foto_rumah/.gitkeep

@@ -1,0 +1,54 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import SuperAdminDashboard from './SuperAdminDashboard';
+import AdminWilayahDashboard from './AdminWilayahDashboard';
+import { apiGet } from '../../services/api';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+
+export default function DashboardPage() {
+  const { user } = useAuth();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [wilayahFilter, setWilayahFilter] = useState('all');
+  const [periode, setPeriode] = useState(new Date().toISOString().slice(0, 7));
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, [wilayahFilter, periode]);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+      const query = new URLSearchParams({ wilayah: wilayahFilter, periode }).toString();
+      const res = await apiGet(`/billings/dashboard-stats?${query}`);
+      setData(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && !data) return <LoadingSpinner text="Memuat data dashboard operasional..." />;
+
+  return (
+    <div className="dashboard-container">
+      {user?.role === 'superadmin' ? (
+        <SuperAdminDashboard
+          data={data}
+          wilayahFilter={wilayahFilter}
+          setWilayahFilter={setWilayahFilter}
+          periode={periode}
+          setPeriode={setPeriode}
+        />
+      ) : (
+        <AdminWilayahDashboard
+          data={data}
+          wilayah={user?.wilayah}
+          periode={periode}
+          setPeriode={setPeriode}
+        />
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,138 @@
+billing-lifemedia/
+├── client/
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── src/
+│       ├── assets/
+│       │   ├── logo_lifemedia.png
+│       │   └── logo_jdn.png
+│       ├── components/
+│       │   ├── common/
+│       │   │   ├── Badge.jsx
+│       │   │   ├── Button.jsx
+│       │   │   ├── Card.jsx
+│       │   │   ├── ConfirmModal.jsx
+│       │   │   ├── DataTable.jsx
+│       │   │   ├── LoadingSpinner.jsx
+│       │   │   ├── Modal.jsx
+│       │   │   ├── StatCard.jsx
+│       │   │   └── Tabs.jsx
+│       │   └── layout/
+│       │       ├── MainLayout.jsx
+│       │       ├── Sidebar.jsx
+│       │       └── Topbar.jsx
+│       ├── context/
+│       │   └── AuthContext.jsx
+│       ├── hooks/
+│       │   ├── useDebounce.js
+│       │   └── useFetch.js
+│       ├── pages/
+│       │   ├── analytics/
+│       │   │   └── AnalyticsPage.jsx
+│       │   ├── auth/
+│       │   │   └── LoginPage.jsx
+│       │   ├── billing/
+│       │   │   ├── BillDetailPage.jsx
+│       │   │   ├── BillListPage.jsx
+│       │   │   └── PrintInvoiceModal.jsx
+│       │   ├── complaints/
+│       │   │   ├── ComplaintDetailPage.jsx
+│       │   │   ├── ComplaintListPage.jsx
+│       │   │   └── TechnicianAssignModal.jsx
+│       │   ├── customers/
+│       │   │   ├── CustomerCreatePage.jsx
+│       │   │   ├── CustomerDetailPage.jsx
+│       │   │   ├── CustomerEditPage.jsx
+│       │   │   ├── CustomerImportPage.jsx
+│       │   │   └── CustomerListPage.jsx
+│       │   ├── dashboard/
+│       │   │   ├── AdminWilayahDashboard.jsx
+│       │   │   ├── DashboardPage.jsx
+│       │   │   └── SuperAdminDashboard.jsx
+│       │   ├── management/
+│       │   │   ├── PaymentConfigPage.jsx
+│       │   │   └── RegionalAdminPage.jsx
+│       │   ├── network/
+│       │   │   ├── CustomerGeoMapPage.jsx
+│       │   │   ├── PPPoEMappingPage.jsx
+│       │   │   └── PPPoEMonitoringPage.jsx
+│       │   ├── payments/
+│       │   │   ├── ManualPaymentVerifyPage.jsx
+│       │   │   ├── PaymentHistoryPage.jsx
+│       │   │   └── PaymentMatchingPage.jsx
+│       │   ├── reports/
+│       │   │   └── FinancialReportPage.jsx
+│       │   └── technicians/
+│       │       ├── TechnicianManagePage.jsx
+│       │       └── TechnicianMonitoringPage.jsx
+│       ├── services/
+│       │   ├── api.js
+│       │   ├── authService.js
+│       │   ├── billingService.js
+│       │   ├── complaintService.js
+│       │   ├── customerService.js
+│       │   ├── paymentService.js
+│       │   ├── pppoeService.js
+│       │   └── reportService.js
+│       ├── styles/
+│       │   ├── design-tokens.css
+│       │   ├── global.css
+│       │   ├── layout.css
+│       │   └── components.css
+│       ├── utils/
+│       │   ├── formatters.js
+│       │   └── helpers.js
+│       ├── App.jsx
+│       └── main.jsx
+│
+├── server/
+│   ├── .env.example
+│   ├── package.json
+│   ├── server.js
+│   ├── config/
+│   │   ├── constants.js
+│   │   ├── database.js
+│   │   └── midtrans.js
+│   ├── controllers/
+│   │   ├── adminController.js
+│   │   ├── analyticsController.js
+│   │   ├── authController.js
+│   │   ├── billingController.js
+│   │   ├── complaintController.js
+│   │   ├── customerController.js
+│   │   ├── paymentController.js
+│   │   ├── pppoeController.js
+│   │   ├── reportController.js
+│   │   └── technicianController.js
+│   ├── middleware/
+│   │   ├── auth.js
+│   │   ├── errorHandler.js
+│   │   ├── roleScope.js
+│   │   └── upload.js
+│   ├── routes/
+│   │   ├── adminRoutes.js
+│   │   ├── analyticsRoutes.js
+│   │   ├── authRoutes.js
+│   │   ├── billingRoutes.js
+│   │   ├── complaintRoutes.js
+│   │   ├── customerRoutes.js
+│   │   ├── paymentRoutes.js
+│   │   ├── pppoeRoutes.js
+│   │   ├── reportRoutes.js
+│   │   └── technicianRoutes.js
+│   ├── services/
+│   │   ├── automatedBillingService.js
+│   │   ├── midtransService.js
+│   │   ├── pppoeProxyService.js
+│   │   └── whatsappService.js
+│   ├── uploads/
+│   │   ├── bukti_transfer/
+│   │   ├── foto_complain/
+│   │   └── foto_rumah/
+│   └── utils/
+│       ├── logger.js
+│       └── normalizer.js
+│
+└── database/
+    └── schema_lifemedia.sql
