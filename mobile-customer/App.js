@@ -30,14 +30,10 @@ export default function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [tab, setTab] = useState('Ringkasan');
-  const [data, setData] = useState({ dashboard: null, bills: [], payments: [], complaints: [], notifications: [], paymentInfo: null });
+  const [data, setData] = useState({ dashboard: null, bills: [], payments: [], complaints: [], notifications: [] });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [manualBill, setManualBill] = useState(null);
-  const [method, setMethod] = useState('Transfer Bank');
-  const [amount, setAmount] = useState('');
-  const [proof, setProof] = useState(null);
   const [category, setCategory] = useState('internet_mati');
   const [description, setDescription] = useState('');
   const [complaintPhoto, setComplaintPhoto] = useState(null);
@@ -46,12 +42,12 @@ export default function App() {
 
   const loadAll = useCallback(async (authToken = token) => {
     if (!authToken) return;
-    const [dashboard, bills, payments, complaints, notifications, paymentInfo] = await Promise.all([
+    const [dashboard, bills, payments, complaints, notifications] = await Promise.all([
       request('/mobile/customer/dashboard', authToken), request('/mobile/customer/bills', authToken),
       request('/mobile/customer/payments', authToken), request('/mobile/customer/complaints', authToken),
-      request('/notifications?limit=50', authToken), request('/mobile/customer/payment-info', authToken),
+      request('/notifications?limit=50', authToken),
     ]);
-    setData({ dashboard, bills: bills || [], payments: payments || [], complaints: complaints || [], notifications: notifications || [], paymentInfo });
+    setData({ dashboard, bills: bills || [], payments: payments || [], complaints: complaints || [], notifications: notifications || [] });
   }, [token]);
 
   useEffect(() => {
@@ -90,39 +86,11 @@ export default function App() {
     finally { setBusy(false); setLoading(false); }
   };
 
-  const logout = async () => { await SecureStore.deleteItemAsync('lm_customer_token'); setToken(''); setData({ dashboard: null, bills: [], payments: [], complaints: [], notifications: [], paymentInfo: null }); };
-
-  const openManualPayment = (bill) => {
-    setManualBill(bill); setAmount(String(bill.nominal_tagihan));
-    const firstMethod = data.paymentInfo?.metode_pembayaran?.[0];
-    if (firstMethod) setMethod(firstMethod.nama);
-  };
-
-  const choosePaymentMethod = () => {
-    const methods = data.paymentInfo?.metode_pembayaran || [];
-    if (!methods.length) return;
-    Alert.alert('Pilih metode pembayaran', 'Pilih rekening/e-wallet yang digunakan', [
-      ...methods.map((item) => ({ text: `${item.nama} · ${item.nomor}`, onPress: () => setMethod(item.nama) })),
-      { text: 'Batal', style: 'cancel' },
-    ]);
-  };
+  const logout = async () => { await SecureStore.deleteItemAsync('lm_customer_token'); setToken(''); setData({ dashboard: null, bills: [], payments: [], complaints: [], notifications: [] }); };
 
   const choosePhoto = async (setPhoto) => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
     if (!result.canceled) setPhoto(result.assets[0]);
-  };
-
-  const submitManual = async () => {
-    if (!proof || !manualBill) return Alert.alert('Bukti pembayaran', 'Pilih foto bukti transfer terlebih dahulu.');
-    setBusy(true);
-    try {
-      const body = new FormData();
-      body.append('tagihan_id', String(manualBill.id)); body.append('nominal_dibayar', amount || String(manualBill.nominal_tagihan)); body.append('metode', method);
-      body.append('file', { uri: proof.uri, name: proof.fileName || `bukti-${Date.now()}.jpg`, type: proof.mimeType || 'image/jpeg' });
-      await request('/mobile/customer/payments/manual', token, { method: 'POST', body });
-      setManualBill(null); setProof(null); setAmount(''); await loadAll(); Alert.alert('Terkirim', 'Bukti pembayaran menunggu verifikasi Admin Wilayah.');
-    } catch (error) { Alert.alert('Pembayaran gagal dikirim', error.message); }
-    finally { setBusy(false); }
   };
 
   const payMidtrans = async (bill) => {
@@ -164,7 +132,7 @@ export default function App() {
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#1570ef" /></View>;
-  if (!token) return <View style={styles.loginPage}><View style={styles.brandMark}><Text style={styles.brandMarkText}>LM</Text></View><Text style={styles.title}>Life Media</Text><Text style={styles.muted}>Masuk ke akun Pelanggan</Text><Field value={username} onChangeText={setUsername} placeholder="Username" /><Field value={password} onChangeText={setPassword} placeholder="Password" secureTextEntry /><Button title={busy ? 'Memeriksa...' : 'Masuk'} onPress={login} disabled={busy} /><Text style={styles.footnote}>Pastikan alamat API perangkat diarahkan ke server Billing Life Media.</Text></View>;
+  if (!token) return <View style={styles.loginPage}><Image source={require('./assets/cleon-logo.png')} resizeMode="contain" style={styles.brandLogo} /><Text style={styles.title}>Life Media</Text><Text style={styles.muted}>Masuk ke akun Pelanggan</Text><Field value={username} onChangeText={setUsername} placeholder="Username" /><Field value={password} onChangeText={setPassword} placeholder="Password" secureTextEntry /><Button title={busy ? 'Memeriksa...' : 'Masuk'} onPress={login} disabled={busy} /><Text style={styles.footnote}>Pastikan alamat API perangkat diarahkan ke server Billing Life Media.</Text></View>;
 
   const dashboard = data.dashboard || {};
   const unread = (data.notifications || []).filter((item) => !item.dibaca_pada).length;
@@ -176,9 +144,9 @@ export default function App() {
       {tab === 'Ringkasan' && <>
         <View style={styles.hero}><Text style={styles.heroLabel}>TOTAL TUNGGAKAN</Text><Text style={styles.heroAmount}>{money(dashboard.total_tunggakan)}</Text><Text style={styles.heroFoot}>{dashboard.customer?.wilayah || ''} · {dashboard.unpaid_bills?.length || 0} tagihan belum lunas</Text></View>
         <Section title="Tagihan Berjalan" />
-        {dashboard.current_bill && <BillCard bill={dashboard.current_bill} onInvoice={() => openBill(dashboard.current_bill)} onMidtrans={() => payMidtrans(dashboard.current_bill)} onManual={() => { openManualPayment(dashboard.current_bill); setTab('Tagihan'); }} />}
+        {dashboard.current_bill && <BillCard bill={dashboard.current_bill} onInvoice={() => openBill(dashboard.current_bill)} onMidtrans={() => payMidtrans(dashboard.current_bill)} />}
         <Section title="Tagihan Belum Lunas" />
-        {(dashboard.unpaid_bills || []).slice(0, 3).map((bill) => <BillCard key={bill.id} bill={bill} onInvoice={() => openBill(bill)} onMidtrans={() => payMidtrans(bill)} onManual={() => { openManualPayment(bill); setTab('Tagihan'); }} />)}
+        {(dashboard.unpaid_bills || []).slice(0, 3).map((bill) => <BillCard key={bill.id} bill={bill} onInvoice={() => openBill(bill)} onMidtrans={() => payMidtrans(bill)} />)}
         {!dashboard.unpaid_bills?.length && <Empty text="Semua tagihan Anda sudah lunas." />}
         <Section title="Complain Terbaru" />
         {(dashboard.recent_complaints || []).map((item) => <TouchableOpacity key={item.id} style={styles.rowCard} onPress={() => openComplaint(item)}><View style={styles.rowMain}><Text style={styles.cardTitle}>{item.nomor_tiket}</Text><Text style={styles.muted}>{label(item.kategori)}</Text></View><Pill value={item.status} /></TouchableOpacity>)}
@@ -186,13 +154,12 @@ export default function App() {
 
       {tab === 'Tagihan' && <>
         <Section title="Riwayat Tagihan" />
-        {data.bills.map((bill) => <BillCard key={bill.id} bill={bill} onInvoice={() => openBill(bill)} onMidtrans={() => payMidtrans(bill)} onManual={() => openManualPayment(bill)} />)}
+        {data.bills.map((bill) => <BillCard key={bill.id} bill={bill} onInvoice={() => openBill(bill)} onMidtrans={() => payMidtrans(bill)} />)}
         {!data.bills.length && <Empty text="Belum ada tagihan." />}
-        {selectedBill && <View style={styles.card}><View style={styles.inline}><Text style={styles.cardTitle}>Invoice {selectedBill.nomor_invoice || `INV-${selectedBill.id}`}</Text><TouchableOpacity onPress={() => setSelectedBill(null)}><Text style={styles.link}>Tutup</Text></TouchableOpacity></View><Pill value={selectedBill.status_bayar} /><Text style={styles.bodyText}>Periode {date(selectedBill.periode)} · jatuh tempo {date(selectedBill.tanggal_jatuh_tempo)}</Text><Text style={styles.amount}>{money(selectedBill.nominal_tagihan)}</Text><Button kind="outline" title="Bagikan Ringkasan Invoice" onPress={() => Share.share({ message: `Invoice ${selectedBill.nomor_invoice || `INV-${selectedBill.id}`}\nPeriode: ${date(selectedBill.periode)}\nJatuh tempo: ${date(selectedBill.tanggal_jatuh_tempo)}\nNominal: ${money(selectedBill.nominal_tagihan)}\nStatus: ${label(selectedBill.status_bayar)}` })} /><Section title="Pembayaran Terkait" />{(selectedBill.payments || []).map((payment) => <View key={payment.id} style={styles.timeline}><View style={styles.rowMain}><Text style={styles.cardTitle}>{payment.order_id}</Text><Text style={styles.muted}>{date(payment.created_at)} · {money(payment.nominal_dibayar)} · {label(payment.status)}</Text>{payment.catatan_admin ? <Text style={styles.warningText}>{payment.catatan_admin}</Text> : null}</View></View>)}{!selectedBill.payments?.length && <Text style={styles.muted}>Belum ada pembayaran untuk invoice ini.</Text>}</View>}
-        {manualBill && <View style={styles.card}><Text style={styles.cardTitle}>Pembayaran Manual · {manualBill.nomor_invoice || `INV-${manualBill.id}`}</Text><Text style={styles.muted}>{data.paymentInfo?.nama_layanan || `Life Media ${dashboard.customer?.wilayah || ''}`}</Text>{(data.paymentInfo?.metode_pembayaran || []).map((item, index) => <View key={`${item.nama}-${index}`} style={styles.paymentMethod}><Text style={styles.cardTitle}>{item.jenis === 'ewallet' ? 'E-Wallet' : 'Bank'} · {item.nama}</Text><Text style={styles.bodyText}>Nomor: {item.nomor}</Text><Text style={styles.bodyText}>Atas nama: {item.atas_nama}</Text></View>)}{data.paymentInfo?.catatan_pembayaran ? <Text style={styles.bodyText}>{data.paymentInfo.catatan_pembayaran}</Text> : null}{data.paymentInfo?.nomor_whatsapp ? <Text style={styles.muted}>Bantuan WhatsApp: {data.paymentInfo.nomor_whatsapp}</Text> : null}{data.paymentInfo?.metode_pembayaran?.length ? <Button kind="outline" title={`Metode: ${method}`} onPress={choosePaymentMethod} /> : <Field value={method} onChangeText={setMethod} placeholder="Metode, misalnya Transfer Bank" />}<Field value={amount} onChangeText={setAmount} placeholder="Nominal dibayar" keyboardType="numeric" /><Button kind="outline" title={proof ? 'Bukti dipilih ✓' : 'Pilih Foto Bukti'} onPress={() => choosePhoto(setProof)} />{proof && <Image source={{ uri: proof.uri }} style={styles.preview} />}<Button title={busy ? 'Mengirim...' : 'Kirim untuk Verifikasi'} onPress={submitManual} disabled={busy} /><Button title="Batal" kind="outline" onPress={() => { setManualBill(null); setProof(null); }} /></View>}
+        {selectedBill && <View style={styles.card}><View style={styles.inline}><Text style={styles.cardTitle}>Invoice {selectedBill.nomor_invoice || `INV-${selectedBill.id}`}</Text><TouchableOpacity onPress={() => setSelectedBill(null)}><Text style={styles.link}>Tutup</Text></TouchableOpacity></View><Pill value={selectedBill.status_bayar} /><Text style={styles.bodyText}>Periode {date(selectedBill.periode)} · jatuh tempo {date(selectedBill.tanggal_jatuh_tempo)}</Text><Text style={styles.amount}>{money(selectedBill.nominal_tagihan)}</Text><Button kind="outline" title="Bagikan Ringkasan Invoice" onPress={() => Share.share({ message: `Invoice ${selectedBill.nomor_invoice || `INV-${selectedBill.id}`}\nPeriode: ${date(selectedBill.periode)}\nJatuh tempo: ${date(selectedBill.tanggal_jatuh_tempo)}\nNominal: ${money(selectedBill.nominal_tagihan)}\nStatus: ${label(selectedBill.status_bayar)}` })} /><Section title="Pembayaran Terkait" />{(selectedBill.payments || []).map((payment) => <View key={payment.id} style={styles.timeline}><View style={styles.rowMain}><Text style={styles.cardTitle}>{payment.order_id}</Text><Text style={styles.muted}>{date(payment.created_at)} · {payment.tipe_pembayaran === 'midtrans' ? (payment.metode || 'Midtrans') : 'Manual (arsip lama)'} · {money(payment.nominal_dibayar)} · {label(payment.status)}</Text>{payment.catatan_admin ? <Text style={styles.warningText}>{payment.catatan_admin}</Text> : null}</View></View>)}{!selectedBill.payments?.length && <Text style={styles.muted}>Belum ada pembayaran untuk invoice ini.</Text>}</View>}
       </>}
 
-      {tab === 'Pembayaran' && <><Section title="Riwayat Pembayaran" />{data.payments.map((payment) => <View key={payment.id} style={styles.rowCard}><View style={styles.rowMain}><Text style={styles.cardTitle}>{payment.order_id}</Text><Text style={styles.muted}>{date(payment.created_at)} · {payment.metode || label(payment.tipe_pembayaran)}</Text><Text style={styles.amount}>{money(payment.nominal_dibayar)}</Text>{payment.catatan_admin ? <Text style={styles.warningText}>Catatan Admin: {payment.catatan_admin}</Text> : null}</View><Pill value={payment.status} /></View>)}{!data.payments.length && <Empty text="Belum ada riwayat pembayaran." />}</>}
+      {tab === 'Pembayaran' && <><Section title="Riwayat Pembayaran" />{data.payments.map((payment) => <View key={payment.id} style={styles.rowCard}><View style={styles.rowMain}><Text style={styles.cardTitle}>{payment.order_id}</Text><Text style={styles.muted}>{date(payment.created_at)} · {payment.tipe_pembayaran === 'midtrans' ? (payment.metode || 'Midtrans') : 'Pembayaran manual (arsip lama)'}</Text><Text style={styles.amount}>{money(payment.nominal_dibayar)}</Text>{payment.catatan_admin ? <Text style={styles.warningText}>Catatan Admin: {payment.catatan_admin}</Text> : null}</View><Pill value={payment.status} /></View>)}{!data.payments.length && <Empty text="Belum ada riwayat pembayaran." />}</>}
 
       {tab === 'Complain' && <>
         <View style={styles.card}><Text style={styles.cardTitle}>Buat Laporan Gangguan</Text><Button title={`Kategori: ${label(category)}`} kind="outline" onPress={() => Alert.alert('Pilih kategori', 'Pilih kategori gangguan', ['internet_mati','internet_lambat','perangkat','kabel_putus','lainnya'].map((item) => ({ text: label(item), onPress: () => setCategory(item) })))} /><Field value={description} onChangeText={setDescription} placeholder="Jelaskan gangguan yang dialami" multiline /><Button title={complaintPhoto ? 'Foto terpilih ✓' : 'Tambah Foto Gangguan'} kind="outline" onPress={() => choosePhoto(setComplaintPhoto)} />{complaintPhoto && <Image source={{ uri: complaintPhoto.uri }} style={styles.preview} />}<Button title={busy ? 'Mengirim...' : 'Kirim Complain'} onPress={submitComplaint} disabled={busy} /></View>
@@ -209,12 +176,12 @@ export default function App() {
 function Section({ title }) { return <Text style={styles.section}>{title}</Text>; }
 function Empty({ text }) { return <View style={styles.empty}><Text style={styles.muted}>{text}</Text></View>; }
 function Pill({ value }) { const paid = ['lunas', 'closed', 'penanganan_selesai'].includes(String(value).toLowerCase()); return <View style={[styles.pill, paid ? styles.pillGreen : styles.pillAmber]}><Text style={[styles.pillText, paid ? styles.greenText : styles.amberText]}>{label(value)}</Text></View>; }
-function BillCard({ bill, onInvoice, onMidtrans, onManual }) { const unpaid = bill.status_bayar !== 'Lunas'; return <View style={styles.card}><View style={styles.inline}><Text style={styles.cardTitle}>{bill.nomor_invoice || `INV-${bill.id}`}</Text><Pill value={bill.status_bayar} /></View><Text style={styles.muted}>Periode {date(bill.periode)} · jatuh tempo {date(bill.tanggal_jatuh_tempo)}</Text><Text style={styles.amount}>{money(bill.nominal_tagihan)}</Text><View style={styles.inline}><Button title="Invoice" kind="outline" onPress={onInvoice} />{unpaid && <><Button title="Midtrans" onPress={onMidtrans} /><Button title="Manual" kind="outline" onPress={onManual} /></>}</View></View>; }
+function BillCard({ bill, onInvoice, onMidtrans }) { const unpaid = bill.status_bayar !== 'Lunas'; return <View style={styles.card}><View style={styles.inline}><Text style={styles.cardTitle}>{bill.nomor_invoice || 'INV-' + bill.id}</Text><Pill value={bill.status_bayar} /></View><Text style={styles.muted}>Periode {date(bill.periode)} · jatuh tempo {date(bill.tanggal_jatuh_tempo)}</Text><Text style={styles.amount}>{money(bill.nominal_tagihan)}</Text><View style={styles.inline}><Button title='Invoice' kind='outline' onPress={onInvoice} />{unpaid && <Button title='Bayar via Midtrans' onPress={onMidtrans} />}</View></View>; }
 function Timeline({ event }) { return <View style={styles.timeline}><View style={styles.timelineDot} /><View style={styles.rowMain}><Text style={styles.cardTitle}>{event.judul || label(event.status)}</Text><Text style={styles.muted}>{date(event.created_at)} · {event.aktor_nama || 'Life Media'}</Text>{event.keterangan ? <Text style={styles.bodyText}>{event.keterangan}</Text> : null}</View></View>; }
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#f3f6fa' }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  loginPage: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#f3f6fa' }, brandMark: { width: 56, height: 56, borderRadius: 18, backgroundColor: '#1570ef', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }, brandMarkText: { color: '#fff', fontWeight: '900', fontSize: 20 }, title: { fontSize: 28, fontWeight: '800', color: '#10233f' }, muted: { color: '#738198', marginTop: 5, lineHeight: 20 }, footnote: { color: '#8b96a8', fontSize: 12, textAlign: 'center', marginTop: 20, lineHeight: 18 },
+  loginPage: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#f3f6fa' }, brandLogo: { width: 150, height: 82, marginBottom: 18 }, title: { fontSize: 28, fontWeight: '800', color: '#10233f' }, muted: { color: '#738198', marginTop: 5, lineHeight: 20 }, footnote: { color: '#8b96a8', fontSize: 12, textAlign: 'center', marginTop: 20, lineHeight: 18 },
   header: { paddingHorizontal: 20, paddingTop: 54, paddingBottom: 16, backgroundColor: '#fff', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderColor: '#e9eef5' }, headerEyebrow: { color: '#1570ef', fontSize: 10, fontWeight: '800', letterSpacing: 1.4 }, headerTitle: { color: '#10233f', fontWeight: '800', fontSize: 19, marginTop: 3 }, logout: { color: '#d04343', fontWeight: '700' }, content: { padding: 16, paddingBottom: 30 }, hero: { padding: 21, borderRadius: 18, backgroundColor: '#155eef', marginBottom: 12 }, heroLabel: { color: '#d8e6ff', fontSize: 11, fontWeight: '800', letterSpacing: 1 }, heroAmount: { color: '#fff', fontSize: 29, fontWeight: '900', marginTop: 9 }, heroFoot: { color: '#d8e6ff', marginTop: 7 }, section: { color: '#20314a', fontWeight: '800', fontSize: 16, marginTop: 18, marginBottom: 10 },
   card: { backgroundColor: '#fff', borderRadius: 15, borderWidth: 1, borderColor: '#e9eef5', padding: 15, marginBottom: 11, gap: 9 }, paymentMethod: { borderWidth: 1, borderColor: '#e9eef5', borderRadius: 11, padding: 10, backgroundColor: '#f8faff' }, rowCard: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e9eef5', padding: 14, marginBottom: 9, flexDirection: 'row', alignItems: 'center', gap: 10 }, rowMain: { flex: 1 }, cardTitle: { color: '#192a43', fontWeight: '800', fontSize: 14 }, amount: { color: '#155eef', fontWeight: '900', fontSize: 19, marginTop: 8 }, bodyText: { color: '#42536b', fontSize: 13, lineHeight: 19, marginTop: 7 }, warningText: { color: '#b54708', fontSize: 12, marginTop: 6 }, inline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   button: { backgroundColor: '#1570ef', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 11, alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: 6 }, buttonText: { color: '#fff', fontWeight: '800', fontSize: 13 }, buttonOutline: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d0d9e7' }, buttonOutlineText: { color: '#34445d' }, disabled: { opacity: 0.55 }, input: { borderWidth: 1, borderColor: '#d9e1ec', borderRadius: 11, paddingHorizontal: 13, paddingVertical: 12, color: '#192a43', backgroundColor: '#fff', marginTop: 8 }, multiline: { minHeight: 85, textAlignVertical: 'top' }, preview: { width: '100%', height: 190, borderRadius: 12, marginTop: 8 },

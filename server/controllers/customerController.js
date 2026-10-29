@@ -1,4 +1,5 @@
 const path = require('node:path');
+const fs = require('node:fs/promises');
 const { Readable } = require('node:stream');
 const ExcelJS = require('exceljs');
 const bcrypt = require('bcryptjs');
@@ -359,14 +360,11 @@ exports.exportExcel = async (req, res, next) => {
 
 exports.importTemplate = async (_req, res, next) => {
   try {
-    const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet('Template Pelanggan');
-    sheet.addRow(['ID Pelanggan','Kode Pelanggan','Nama','Nama KTP','NIK','Nomor WhatsApp','Alamat Lengkap','Wilayah','Paket','Tarif','Status','Tanggal Aktif','Longitude','Latitude','Username PPPoE']);
-    sheet.addRow(['SLM-1001','C1001','Nama Pelanggan','Nama Sesuai KTP','','62812...','Dusun/RT/RW','SALAM','20 Mbps',175000,'Aktif','2026-01-15',110.37,-7.79,'akun-pppoe']);
-    sheet.getRow(1).font = { bold: true };
-    const buffer = await workbook.xlsx.writeBuffer();
+    const templatePath = path.resolve(__dirname, '../../template_import_pelanggan.xlsx');
+    const template = await fs.readFile(templatePath);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="template-pelanggan.xlsx"');
-    return res.send(Buffer.from(buffer));
+    res.setHeader('Content-Disposition', 'attachment; filename="template_import_pelanggan.xlsx"');
+    return res.send(template);
   } catch (error) { return next(error); }
 };
 

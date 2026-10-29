@@ -52,7 +52,6 @@ exports.dashboard = async (req, res, next) => {
       const complaints = demo.complaints.filter((item) => ids.has(item.pelanggan_id));
       const activeComplaints = complaints.filter((item) => !['closed', 'ditolak'].includes(item.status));
       const pppoe = demo.pppoe.filter((item) => !region || normalize(item.wilayah) === normalize(region));
-      const pendingPayments = demo.payments.filter((item) => ids.has(item.pelanggan_id) && item.status === 'menunggu_verifikasi');
       const technicianIds = new Set(activeComplaints.map((item) => item.teknisi_id).filter(Boolean));
       const recentComplaints = activeComplaints.slice(0, 8).map((item) => {
         const customer = customers.find((row) => row.id === item.pelanggan_id) || {};
@@ -72,7 +71,6 @@ exports.dashboard = async (req, res, next) => {
         complainAktif: activeComplaints.length,
         complainBaru: complaints.filter((item) => item.status === 'menunggu_verifikasi').length,
         teknisiBertugas: technicianIds.size,
-        pembayaranManualMenunggu: pendingPayments.length,
       }, recentComplaints } });
     }
 
@@ -93,7 +91,7 @@ exports.dashboard = async (req, res, next) => {
       billParams,
     );
     const [[paymentStats]] = await db.query(
-      `SELECT COALESCE(SUM(CASE WHEN pay.status='lunas' THEN pay.nominal_dibayar ELSE 0 END),0) totalPembayaran, SUM(pay.status='menunggu_verifikasi' AND pay.tipe_pembayaran='manual') pembayaranManualMenunggu FROM payments pay JOIN pelanggan_salam c ON c.id=pay.pelanggan_id ${paymentWhere}`,
+      "SELECT COALESCE(SUM(CASE WHEN pay.status='lunas' AND pay.tipe_pembayaran='midtrans' THEN pay.nominal_dibayar ELSE 0 END),0) totalPembayaran FROM payments pay JOIN pelanggan_salam c ON c.id=pay.pelanggan_id " + paymentWhere,
       paymentParams,
     );
     const [[complaintStats]] = await db.query(
@@ -117,7 +115,7 @@ exports.dashboard = async (req, res, next) => {
       pelangganTidakAktif: Number(customerStats.pelangganTidakAktif || 0), totalTagihan: Number(billStats.totalTagihan || 0),
       lunas: Number(billStats.lunas || 0), belumLunas: Number(billStats.belumLunas || 0),
       totalTunggakan: Number(billStats.totalTunggakan || 0), totalPembayaran: Number(paymentStats.totalPembayaran || 0),
-      pembayaranManualMenunggu: Number(paymentStats.pembayaranManualMenunggu || 0), complainAktif: Number(complaintStats.complainAktif || 0),
+      complainAktif: Number(complaintStats.complainAktif || 0),
       complainBaru: Number(complaintStats.complainBaru || 0), teknisiBertugas: Number(complaintStats.teknisiBertugas || 0), pppoeOnline, pppoeOffline,
     }, recentComplaints } });
   } catch (error) { return next(error); }

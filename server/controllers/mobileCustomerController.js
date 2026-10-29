@@ -67,25 +67,6 @@ exports.payments = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
-exports.paymentInfo = async (req, res, next) => {
-  try {
-    const customerId = Number(req.user.pelanggan_id);
-    if (isDemo()) {
-      const customer = demo.customers.find((item) => item.id === customerId);
-      if (!customer) return res.status(404).json({ success: false, message: 'Data pelanggan tidak ditemukan.' });
-      const config = (demo.regionConfigs || []).find((item) => item.wilayah === customer.alamat);
-      return res.json({ success: true, data: config || { wilayah: customer.alamat, nama_layanan: `Life Media ${customer.alamat}`, nomor_whatsapp: '', catatan_pembayaran: '', metode_pembayaran: [] } });
-    }
-    const [[customer]] = await db.query('SELECT alamat FROM pelanggan_salam WHERE id=?', [customerId]);
-    if (!customer) return res.status(404).json({ success: false, message: 'Data pelanggan tidak ditemukan.' });
-    const [[config]] = await db.query('SELECT id,wilayah,nama_layanan,nomor_whatsapp,catatan_pembayaran FROM wilayah_configs WHERE wilayah=?', [customer.alamat]);
-    if (!config) return res.json({ success: true, data: { wilayah: customer.alamat, nama_layanan: `Life Media ${customer.alamat}`, nomor_whatsapp: '', catatan_pembayaran: '', metode_pembayaran: [] } });
-    const [methods] = await db.query('SELECT jenis,nama,nomor,atas_nama FROM wilayah_payment_methods WHERE wilayah_config_id=? ORDER BY id', [config.id]);
-    const { id, ...data } = config;
-    return res.json({ success: true, data: { ...data, metode_pembayaran: methods } });
-  } catch (error) { return next(error); }
-};
-
 exports.complaints = async (req, res, next) => {
   try {
     const customerId = Number(req.user.pelanggan_id);

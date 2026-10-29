@@ -132,3 +132,37 @@ exports.updateTask = async (req, res, next) => {
     return res.json({ success: true, data: { id, status: nextStatus } });
   } catch (error) { return next(error); }
 };
+
+exports.updateLocation = async (req, res, next) => {
+  try {
+    const latitude = Number(req.body.latitude);
+    const longitude = Number(req.body.longitude);
+    const accuracy = req.body.accuracy_m == null || req.body.accuracy_m === '' ? null : Number(req.body.accuracy_m);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
+      || !Number.isFinite(longitude) || longitude < -180 || longitude > 180
+      || (accuracy != null && (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 10000))) {
+      return res.status(400).json({ success: false, message: 'Koordinat lokasi tidak valid.' });
+    }
+
+    const technicianId = Number(req.user.technician_id);
+    if (!Number.isSafeInteger(technicianId) || technicianId < 1) {
+      return res.status(403).json({ success: false, message: 'Akun teknisi belum terhubung ke data teknisi.' });
+    }
+
+    const recordedAt = new Date().toISOString();
+    if (isDemo()) {
+      const technician = demo.technicians.find((item) => item.id === technicianId);
+      if (!technician) return res.status(403).json({ success: false, message: 'Akun teknisi belum terhubung ke data teknisi.' });
+      Object.assign(technician, { latitude, longitude, accuracy_m: accuracy, location_updated_at: recordedAt, location_is_demo: false });
+      return res.json({ success: true, data: { latitude, longitude, accuracy_m: accuracy, recorded_at: recordedAt } });
+    }
+
+    await db.query(
+      `INSERT INTO technician_locations (technician_id,latitude,longitude,accuracy_m,recorded_at)
+       VALUES (?,?,?,?,CURRENT_TIMESTAMP)
+       ON DUPLICATE KEY UPDATE latitude=VALUES(latitude),longitude=VALUES(longitude),accuracy_m=VALUES(accuracy_m),recorded_at=CURRENT_TIMESTAMP`,
+      [technicianId, latitude, longitude, accuracy],
+    );
+    return res.json({ success: true, data: { latitude, longitude, accuracy_m: accuracy, recorded_at: recordedAt } });
+  } catch (error) { return next(error); }
+};

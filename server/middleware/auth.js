@@ -1,6 +1,14 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
-const { demo, isDemo } = require('../utils/helpers');
+const { demo, isDemo, isOfficialRegion, normalize } = require('../utils/helpers');
+
+const rejectAdminWithoutRegion = (user, res) => {
+  if (user.role === 'admin' && !isOfficialRegion(user.wilayah)) {
+    res.status(403).json({ success: false, message: 'Akun Admin Wilayah belum memiliki wilayah resmi.' });
+    return true;
+  }
+  return false;
+};
 
 module.exports = async (req, res, next) => {
   const authorization = req.headers.authorization;
@@ -16,24 +24,28 @@ module.exports = async (req, res, next) => {
     if (!current) return res.status(401).json({ success: false, message: 'Akun tidak aktif atau tidak ditemukan.' });
     req.user = { ...claims, role: current.role, wilayah: current.wilayah, nama_lengkap: current.nama_lengkap,
       pelanggan_id: current.pelanggan_id || claims.pelanggan_id || null, technician_id: current.technician_id || claims.technician_id || null };
+    if (rejectAdminWithoutRegion(req.user, res)) return;
     return next();
   }
 
   try {
     const [[current]] = await db.query("SELECT id,username,role,wilayah,nama_lengkap,status FROM users WHERE id=?", [claims.id]);
     if (!current || current.status !== 'aktif') return res.status(401).json({ success: false, message: 'Akun tidak aktif atau tidak ditemukan.' });
-    const user = { ...claims, username: current.username, role: current.role, wilayah: current.wilayah, nama_lengkap: current.nama_lengkap, pelanggan_id: null, technician_id: null };
-    if (current.role === 'pelanggan') {
+    const role = String(current.role || '').trim().toLowerCase();
+    const wilayah = role === 'admin' ? normalize(current.wilayah) : current.wilayah;
+    const user = { ...claims, username: current.username, role, wilayah, nama_lengkap: current.nama_lengkap, pelanggan_id: null, technician_id: null };
+    if (role === 'pelanggan') {
       const [[customer]] = await db.query('SELECT id,alamat FROM pelanggan_salam WHERE user_id=? LIMIT 1', [current.id]);
       if (!customer) return res.status(403).json({ success: false, message: 'Akun pelanggan belum terhubung ke data pelanggan.' });
       user.pelanggan_id = customer.id; user.wilayah = customer.alamat;
     }
-    if (current.role === 'teknisi') {
+    if (role === 'teknisi') {
       const [[technician]] = await db.query('SELECT id,wilayah_tugas FROM technicians WHERE user_id=? LIMIT 1', [current.id]);
       if (!technician) return res.status(403).json({ success: false, message: 'Akun teknisi belum terhubung ke data teknisi.' });
       user.technician_id = technician.id; user.wilayah = technician.wilayah_tugas;
     }
     req.user = user;
+    if (rejectAdminWithoutRegion(req.user, res)) return;
     return next();
   } catch (error) { return next(error); }
 };

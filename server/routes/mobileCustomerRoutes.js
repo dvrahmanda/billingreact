@@ -10,8 +10,6 @@ router.get('/dashboard', customer.dashboard);
 router.get('/bills', customer.bills);
 router.get('/bills/:id', customer.billDetail);
 router.get('/payments', customer.payments);
-router.get('/payment-info', customer.paymentInfo);
-router.post('/payments/manual', upload.transferProof.single('file'), payments.createManualForCustomer);
 router.post('/payments/midtrans', payments.createMidtransForCustomer);
 router.get('/complaints', customer.complaints);
 router.post('/complaints', upload.complaintPhoto.single('file'), customer.createComplaint);

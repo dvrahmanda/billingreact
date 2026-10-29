@@ -28,19 +28,15 @@ const bills = customers.map((c,i)=>({
 }));
 
 const payments = [
- {id:1,order_id:'PAY-202610-001',pelanggan_id:2,tagihan_id:2,periode:period,tipe_pembayaran:'midtrans',metode:'QRIS',nominal_tagihan:225000,nominal_dibayar:225000,status:'lunas',created_at:iso(-8)},
- {id:2,order_id:'PAY-202610-002',pelanggan_id:5,tagihan_id:5,periode:period,tipe_pembayaran:'manual',metode:'Transfer BCA',nominal_tagihan:175000,nominal_dibayar:175000,status:'lunas',created_at:iso(-5)},
- {id:3,order_id:'PAY-202610-003',pelanggan_id:1,tagihan_id:1,periode:period,tipe_pembayaran:'manual',metode:'Transfer BCA',nominal_tagihan:175000,nominal_dibayar:175000,status:'menunggu_verifikasi',bukti_transfer:'uploads/bukti_transfer/demo-bukti.jpg',created_at:iso(-1)},
- {id:4,order_id:'PAY-202610-004',pelanggan_id:6,tagihan_id:6,periode:period,tipe_pembayaran:'manual',metode:'Transfer BCA',nominal_tagihan:225000,nominal_dibayar:200000,status:'menunggu_verifikasi',bukti_transfer:'uploads/bukti_transfer/demo-bukti.jpg',created_at:iso(-1)}
+ {id:1,order_id:'PAY-202610-001',pelanggan_id:2,tagihan_id:2,periode:period,tipe_pembayaran:'midtrans',metode:'QRIS',nominal_tagihan:225000,nominal_dibayar:225000,status:'lunas',created_at:iso(-8)}
 ];
-
 const pppoe = [
- {username:'salam-ayu',customer_id:1,customer_name:'Ayu Lestari',wilayah:'SALAM',ip:'10.10.1.21',mac:'A4:CF:12:34:56:01',router:'RTR-SALAM-01',uptime:'3d 04:11:22',status:'ONLINE'},
- {username:'salam-bima',customer_id:2,customer_name:'Bima Pratama',wilayah:'SALAM',ip:'10.10.1.31',mac:'A4:CF:12:34:56:02',router:'RTR-SALAM-01',uptime:'-',status:'OFFLINE'},
- {username:'baran-citra',customer_id:3,customer_name:'Citra Wulandari',wilayah:'BARAN',ip:'10.20.1.10',mac:'A4:CF:12:34:56:03',router:'RTR-BARAN-01',uptime:'1d 10:05:04',status:'ONLINE'},
- {username:'gunung-dimas',customer_id:4,customer_name:'Dimas Nugroho',wilayah:'GUNUNGMANUK',ip:'10.30.1.8',mac:'A4:CF:12:34:56:04',router:'RTR-GNM-01',uptime:'-',status:'OFFLINE'},
- {username:'ngasemayu-eka',customer_id:5,customer_name:'Eka Rahma',wilayah:'NGASEMAYU',ip:'10.40.1.7',mac:'A4:CF:12:34:56:05',router:'RTR-NGA-01',uptime:'6d 08:42:19',status:'ONLINE'},
- {username:'trosari-fajar',customer_id:6,customer_name:'Fajar Hidayat',wilayah:'TROSARI',ip:'10.50.1.7',mac:'A4:CF:12:34:56:06',router:'RTR-TRS-01',uptime:'0d 08:14:03',status:'ONLINE'},
+ {username:'salam-ayu',customer_id:1,customer_name:'Ayu Lestari',wilayah:'SALAM',ip:'10.10.1.21',mac:'A4:CF:12:34:56:01',router:'RTR-SALAM-01',uptime:'3d 04:11:22',status:'ONLINE',latitude:-7.7981,longitude:110.3774},
+ {username:'salam-bima',customer_id:2,customer_name:'Bima Pratama',wilayah:'SALAM',ip:'10.10.1.31',mac:'A4:CF:12:34:56:02',router:'RTR-SALAM-01',uptime:'-',status:'OFFLINE',latitude:-7.8015,longitude:110.3811},
+ {username:'baran-citra',customer_id:3,customer_name:'Citra Wulandari',wilayah:'BARAN',ip:'10.20.1.10',mac:'A4:CF:12:34:56:03',router:'RTR-BARAN-01',uptime:'1d 10:05:04',status:'ONLINE',latitude:-7.7915,longitude:110.3901},
+ {username:'gunung-dimas',customer_id:4,customer_name:'Dimas Nugroho',wilayah:'GUNUNGMANUK',ip:'10.30.1.8',mac:'A4:CF:12:34:56:04',router:'RTR-GNM-01',uptime:'-',status:'OFFLINE',latitude:-7.8055,longitude:110.4012},
+ {username:'ngasemayu-eka',customer_id:5,customer_name:'Eka Rahma',wilayah:'NGASEMAYU',ip:'10.40.1.7',mac:'A4:CF:12:34:56:05',router:'RTR-NGA-01',uptime:'6d 08:42:19',status:'ONLINE',latitude:-7.8122,longitude:110.4102},
+ {username:'trosari-fajar',customer_id:6,customer_name:'Fajar Hidayat',wilayah:'TROSARI',ip:'10.50.1.7',mac:'A4:CF:12:34:56:06',router:'RTR-TRS-01',uptime:'0d 08:14:03',status:'ONLINE',latitude:-7.8201,longitude:110.4201},
  {username:'unmatched-demo',customer_id:null,customer_name:null,wilayah:'SALAM',ip:'10.10.1.99',mac:'A4:CF:12:34:56:99',router:'RTR-SALAM-01',uptime:'0d 01:02:03',status:'ONLINE'}
 ];
 

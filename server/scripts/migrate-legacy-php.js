@@ -50,7 +50,7 @@ async function run() {
   await requireSourceTable('users');
   await requireSourceTable('pelanggan_salam');
   await requireSourceTable('tagihan_salam');
-  for (const table of ['users', 'pelanggan_salam', 'tagihan_salam', 'pelanggan_detail_salam', 'wilayah_configs', 'wilayah_payment_methods', 'payments', 'complaints', 'technicians']) {
+  for (const table of ['users', 'pelanggan_salam', 'tagihan_salam', 'pelanggan_detail_salam', 'wilayah_configs', 'payments', 'complaints', 'technicians']) {
     if (!await tableExists(target, table)) throw new Error(`Schema React belum lengkap: tabel ${table} tidak ada. Import database/schema_lifemedia.sql dahulu.`);
   }
 
@@ -76,10 +76,20 @@ async function run() {
   const customerRegionByUserId = new Map(supportedCustomers
     .filter((row) => row.user_id != null)
     .map((row) => [Number(row.user_id), normalizeRegion(row.alamat)]));
+  const broadAdminUsers = users.filter((row) => {
+    const legacyRole = String(row.role || 'admin').toLowerCase();
+    const region = normalizeRegion(row.wilayah) || customerRegionByUserId.get(Number(row.id)) || '';
+    return legacyRole === 'admin' && ['SEMUA', 'ALL'].includes(region);
+  });
+  if (broadAdminUsers.length) {
+    const names = broadAdminUsers.map((row) => row.username || `ID ${row.id}`).join(', ');
+    throw new Error(`Migrasi dihentikan: akun Admin lama dengan wilayah SEMUA/ALL (${names}) tidak dapat dipetakan otomatis. Tetapkan role dan wilayahnya secara manual sebelum mengulang migrasi.`);
+  }
   const importableUsers = users.filter((row) => {
     const legacyRole = String(row.role || 'admin').toLowerCase();
     const region = normalizeRegion(row.wilayah) || customerRegionByUserId.get(Number(row.id)) || '';
-    return legacyRole === 'superadmin' || (legacyRole === 'admin' && ['SEMUA', 'ALL'].includes(region)) || supportedRegions.has(region);
+    return ['superadmin', 'admin', 'teknisi', 'pelanggan'].includes(legacyRole)
+      && (legacyRole === 'superadmin' || supportedRegions.has(region));
   });
   const userIds = new Set(importableUsers.map((row) => Number(row.id)));
   const detailFields = ['nama_ktp', 'nik', 'foto_rumah', 'koordinat_x', 'koordinat_y', 'pppoe_user', 'catatan'];
@@ -93,8 +103,7 @@ async function run() {
     for (const row of importableUsers) {
       const legacyRole = String(row.role || 'admin').toLowerCase();
       const region = normalizeRegion(row.wilayah) || customerRegionByUserId.get(Number(row.id)) || '';
-      const role = legacyRole === 'superadmin' || (legacyRole === 'admin' && ['SEMUA', 'ALL'].includes(region)) ? 'superadmin'
-        : ['admin', 'teknisi', 'pelanggan'].includes(legacyRole) ? legacyRole : 'admin';
+      const role = legacyRole;
       const name = row.nama_lengkap || row.nama || row.username;
       await connection.query(
         `INSERT INTO users (id,username,password,role,wilayah,nama_lengkap,nomor_telepon,status,created_at)
@@ -178,18 +187,9 @@ async function run() {
         if (!supportedRegions.has(region)) { copied.unsupportedConfigs += 1; continue; }
         const name = String(config.nama_layanan || `Life Media ${region}`).slice(0, 150);
         await connection.query(
-          'INSERT INTO wilayah_configs (wilayah,nama_layanan,nomor_whatsapp,catatan_pembayaran) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE nama_layanan=VALUES(nama_layanan),nomor_whatsapp=VALUES(nomor_whatsapp),catatan_pembayaran=VALUES(catatan_pembayaran)',
-          [region, name, String(config.nomor_whatsapp || '').slice(0, 30) || null, config.catatan_pembayaran || null],
+          'INSERT INTO wilayah_configs (wilayah,nama_layanan,nomor_whatsapp) VALUES (?,?,?) ON DUPLICATE KEY UPDATE nama_layanan=VALUES(nama_layanan),nomor_whatsapp=VALUES(nomor_whatsapp)',
+          [region, name, String(config.nomor_whatsapp || '').slice(0, 30) || null],
         );
-        const [[savedConfig]] = await connection.query('SELECT id FROM wilayah_configs WHERE wilayah=? FOR UPDATE', [region]);
-        await connection.query('DELETE FROM wilayah_payment_methods WHERE wilayah_config_id=?', [savedConfig.id]);
-        for (const method of Array.isArray(config.metode_pembayaran) ? config.metode_pembayaran : []) {
-          const jenis = ['ewallet', 'e-wallet'].includes(String(method.jenis || '').toLowerCase()) ? 'ewallet' : 'bank';
-          const nama = String(method.nama || '').trim().slice(0, 80);
-          const nomor = String(method.nomor || '').trim().slice(0, 80);
-          const atasNama = String(method.atas_nama || '').trim().slice(0, 120);
-          if (nama && nomor && atasNama) await connection.query('INSERT INTO wilayah_payment_methods (wilayah_config_id,jenis,nama,nomor,atas_nama) VALUES (?,?,?,?,?)', [savedConfig.id, jenis, nama, nomor, atasNama]);
-        }
         copied.regionConfigs += 1;
       }
     }

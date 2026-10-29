@@ -8,7 +8,7 @@ function filters(req) {
   const params = [];
   const region = req.user.role === 'superadmin'
     ? (req.wilayahScope && req.wilayahScope !== 'all' ? req.wilayahScope : null)
-    : req.user.wilayah;
+    : req.wilayahScope;
   if (region) { clauses.push('t.alamat_snapshot=?'); params.push(region); }
   if (req.query.periode) { clauses.push('t.periode=?'); params.push(periodDate(req.query.periode)); }
   if (req.query.date_from) { clauses.push('t.periode>=?'); params.push(req.query.date_from); }
@@ -25,7 +25,6 @@ function filters(req) {
   }
   if (req.query.status) { clauses.push('t.status_bayar=?'); params.push(req.query.status); }
   if (req.query.metode === 'Midtrans') clauses.push("(LOWER(t.metode_pembayaran)='midtrans' OR EXISTS(SELECT 1 FROM payments pm WHERE pm.tagihan_id=t.id AND pm.tipe_pembayaran='midtrans'))");
-  else if (req.query.metode === 'Transfer Manual') clauses.push("(LOWER(t.metode_pembayaran) IN ('transfer manual','manual') OR EXISTS(SELECT 1 FROM payments pm WHERE pm.tagihan_id=t.id AND pm.tipe_pembayaran='manual'))");
   else if (req.query.metode) { clauses.push('t.metode_pembayaran=?'); params.push(req.query.metode); }
   return { clauses, params, region };
 }
@@ -66,8 +65,7 @@ async function fetchRows(req) {
       if (req.query.q && ![bill.nomor_invoice, bill.id_pelanggan_snapshot, bill.nama_snapshot].some((value) => String(value || '').toLowerCase().includes(String(req.query.q).trim().toLowerCase()))) return false;
       if (req.query.status && bill.status_bayar !== req.query.status) return false;
       if (req.query.metode === 'Midtrans' && String(bill.metode_pembayaran || '').toLowerCase() !== 'midtrans' && !demo.payments.some((payment) => payment.tagihan_id === bill.id && payment.tipe_pembayaran === 'midtrans')) return false;
-      if (req.query.metode === 'Transfer Manual' && !['transfer manual', 'manual'].includes(String(bill.metode_pembayaran || '').toLowerCase()) && !demo.payments.some((payment) => payment.tagihan_id === bill.id && payment.tipe_pembayaran === 'manual')) return false;
-      if (req.query.metode && !['Midtrans','Transfer Manual'].includes(req.query.metode) && bill.metode_pembayaran !== req.query.metode) return false;
+      if (req.query.metode && req.query.metode !== 'Midtrans' && bill.metode_pembayaran !== req.query.metode) return false;
       return true;
     });
   }

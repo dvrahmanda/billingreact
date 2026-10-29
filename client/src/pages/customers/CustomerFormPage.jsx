@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import { useNavigate,useParams } from 'react-router-dom';
 import Button from '../../components/common/Button';
+import BackButton from '../../components/common/BackButton';
 import Card from '../../components/common/Card';
 import { apiGet,apiPost,apiPut } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -9,7 +10,7 @@ export default function CustomerFormPage({mode}){
  const {id}=useParams(),nav=useNavigate();const{user}=useAuth(); const [form,setForm]=useState({...blank,alamat:user?.wilayah||'SALAM'}),[busy,setBusy]=useState(false);
  useEffect(()=>{if(mode==='edit')apiGet(`/customers/${id}`).then(r=>setForm({...blank,...r.data,alamat:r.data.wilayah||r.data.alamat})).catch(e=>alert(e.friendlyMessage||'Data pelanggan gagal dimuat.'))},[id,mode]);
  const set=(k,v)=>setForm(f=>({...f,[k]:v})); const submit=async e=>{e.preventDefault();if(Boolean(form.username_mobile)!==Boolean(form.password_mobile))return alert('Isi username dan password mobile bersama-sama.');if(form.password_mobile&&form.password_mobile.length<8)return alert('Password mobile minimal 8 karakter.');setBusy(true);try{if(mode==='edit'){await apiPut(`/customers/${id}`,form);if(form.username_mobile)await apiPost(`/customers/${id}/mobile-account`,{username:form.username_mobile,password:form.password_mobile})}else await apiPost('/customers',form);nav('/customers')}catch(err){alert(err.friendlyMessage||'Gagal menyimpan')}finally{setBusy(false)}};
- return <div className="page-container"><div className="page-header"><div><h1>{mode==='edit'?'Edit Pelanggan':'Tambah Pelanggan'}</h1><p>Lengkapi identitas, layanan, dan data koneksi pelanggan.</p></div></div><Card><form onSubmit={submit}><div className="form-grid">
+ return <div className="page-container"><div className="page-header"><div className="page-heading"><BackButton to={mode==='edit'?`/customers/${id}`:'/customers'} /><div><h1>{mode==='edit'?'Edit Pelanggan':'Tambah Pelanggan'}</h1><p>Lengkapi identitas, layanan, dan data koneksi pelanggan.</p></div></div></div><Card><form onSubmit={submit}><div className="form-grid">
  {[
  ['id_pelanggan','ID Pelanggan','text'],['kode_pelanggan','Kode Pelanggan','text'],['nama','Nama Pelanggan','text'],['nama_ktp','Nama KTP','text'],['nik','NIK','text'],['nomor_pelanggan','Nomor WhatsApp','text'],['alamat_lengkap','Alamat Lengkap','text'],
  ['paket','Paket Internet','text'],['tarif_langganan','Tarif','number'],['tanggal_daftar','Tanggal Aktif','date'],['koordinat_x','Koordinat Longitude','number'],['koordinat_y','Koordinat Latitude','number'],['pppoe_user','Username PPPoE','text']

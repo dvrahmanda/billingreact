@@ -9,7 +9,7 @@
     "android": { "package": "id.lifemedia.billing.customer" },
     "plugins": [
       "expo-secure-store",
-      ["expo-image-picker", { "photosPermission": "Life Media membutuhkan akses foto untuk bukti pembayaran dan laporan gangguan.", "cameraPermission": "Life Media membutuhkan kamera untuk mengambil bukti pembayaran dan foto gangguan." }]
+      ["expo-image-picker", { "photosPermission": "Life Media membutuhkan akses foto untuk laporan gangguan.", "cameraPermission": "Life Media membutuhkan kamera untuk mengambil foto gangguan." }]
     ]
   }
 }

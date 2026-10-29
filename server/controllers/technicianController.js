@@ -7,21 +7,84 @@ exports.list = async (req, res, next) => {
   try {
     if (isDemo()) {
       let rows = demo.technicians.map((technician) => {
-        const tasks = demo.complaints.filter((item) => item.teknisi_id === technician.id);
-        return { ...technician, active_jobs: tasks.filter((item) => !['closed', 'ditolak'].includes(item.status)).length,
-          completed_jobs: tasks.filter((item) => item.status === 'closed').length };
+        const tasks = demo.complaints.filter((item) => item.teknisi_id === technician.id
+          && normalize(demo.customers.find((customer) => customer.id === item.pelanggan_id)?.alamat) === normalize(technician.wilayah_tugas));
+        const active = tasks.filter((item) => !['closed', 'ditolak', 'penanganan_selesai'].includes(item.status));
+        const customer = active[0] && demo.customers.find((item) => item.id === active[0].pelanggan_id);
+        return { ...technician, active_jobs: active.length,
+          completed_jobs: tasks.filter((item) => ['penanganan_selesai', 'closed'].includes(item.status)).length,
+          current_customer: customer?.nama || null };
       });
-      if (req.user.role !== 'superadmin') rows = rows.filter((item) => normalize(item.wilayah_tugas) === normalize(req.user.wilayah));
+      if (req.wilayahScope !== 'all') rows = rows.filter((item) => normalize(item.wilayah_tugas) === normalize(req.wilayahScope));
       return res.json({ success: true, data: rows });
     }
     const params = []; let where = '';
-    if (req.user.role !== 'superadmin') { where = 'WHERE t.wilayah_tugas=?'; params.push(req.user.wilayah); }
+    if (req.wilayahScope !== 'all') { where = 'WHERE t.wilayah_tugas=?'; params.push(req.wilayahScope); }
     const [rows] = await db.query(
-      `SELECT t.*,(SELECT COUNT(*) FROM complaints c WHERE c.teknisi_id=t.id AND c.status NOT IN ('closed','ditolak')) active_jobs,
-       (SELECT COUNT(*) FROM complaints c WHERE c.teknisi_id=t.id AND c.status IN ('penanganan_selesai','closed')) completed_jobs
-       FROM technicians t ${where} ORDER BY t.wilayah_tugas,t.nama`, params,
+      `SELECT t.*,l.latitude,l.longitude,l.accuracy_m, l.recorded_at location_updated_at,
+       (SELECT COUNT(*) FROM complaints c JOIN pelanggan_salam p ON p.id=c.pelanggan_id
+        WHERE c.teknisi_id=t.id AND p.alamat=t.wilayah_tugas AND c.status NOT IN ('closed','ditolak','penanganan_selesai')) active_jobs,
+       (SELECT COUNT(*) FROM complaints c JOIN pelanggan_salam p ON p.id=c.pelanggan_id
+        WHERE c.teknisi_id=t.id AND p.alamat=t.wilayah_tugas AND c.status IN ('penanganan_selesai','closed')) completed_jobs,
+       (SELECT p.nama FROM complaints c JOIN pelanggan_salam p ON p.id=c.pelanggan_id
+        WHERE c.teknisi_id=t.id AND p.alamat=t.wilayah_tugas AND c.status NOT IN ('closed','ditolak','penanganan_selesai') ORDER BY c.updated_at DESC,c.id DESC LIMIT 1) current_customer
+       FROM technicians t LEFT JOIN technician_locations l ON l.technician_id=t.id ${where} ORDER BY t.wilayah_tugas,t.nama`, params,
     );
     return res.json({ success: true, data: rows });
+  } catch (error) { return next(error); }
+};
+
+exports.monitoring = async (req, res, next) => {
+  try {
+    const technicianId = Number(req.params.id);
+    if (!Number.isSafeInteger(technicianId) || technicianId < 1) return res.status(404).json({ success: false, message: 'Teknisi tidak ditemukan.' });
+    const scope = req.wilayahScope;
+    if (isDemo()) {
+      const technician = demo.technicians.find((item) => item.id === technicianId
+        && (scope === 'all' || normalize(item.wilayah_tugas) === normalize(scope)));
+      if (!technician) return res.status(404).json({ success: false, message: 'Teknisi tidak ditemukan.' });
+      const assignedComplaints = demo.complaints.filter((item) => item.teknisi_id === technicianId).filter((item) => {
+        const customer = demo.customers.find((row) => row.id === item.pelanggan_id);
+        return scope === 'all' || normalize(customer?.alamat) === normalize(scope);
+      });
+      const tasks = assignedComplaints.map((item) => {
+        const customer = demo.customers.find((row) => row.id === item.pelanggan_id) || {};
+        return { id: item.id, nomor_tiket: item.nomor_tiket, kategori: item.kategori, status: item.status,
+          nama_pelanggan: customer.nama, wilayah: customer.alamat, updated_at: item.updated_at || item.created_at };
+      });
+      const activity = assignedComplaints.flatMap((item) => {
+        const customer = demo.customers.find((row) => row.id === item.pelanggan_id) || {};
+        return (item.timeline || []).map((event, index) => ({ ...event, id: `${item.id}-${index}`, complaint_id: item.id,
+          nomor_tiket: item.nomor_tiket, status_tiket: item.status, nama_pelanggan: customer.nama, wilayah: customer.alamat }));
+      }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 50);
+      return res.json({ success: true, data: { technician, tasks, activity } });
+    }
+
+    const locationRegionFilter = scope === 'all' ? '' : ' AND t.wilayah_tugas=?';
+    const locationParams = scope === 'all' ? [technicianId] : [technicianId, scope];
+    const [[technician]] = await db.query(
+      `SELECT t.id,t.nama,t.nomor_whatsapp,t.wilayah_tugas,t.status,l.latitude,l.longitude,l.accuracy_m,
+       l.recorded_at location_updated_at FROM technicians t LEFT JOIN technician_locations l ON l.technician_id=t.id
+       WHERE t.id=?${locationRegionFilter} LIMIT 1`, locationParams,
+    );
+    if (!technician) return res.status(404).json({ success: false, message: 'Teknisi tidak ditemukan.' });
+
+    const taskRegionFilter = scope === 'all' ? '' : ' AND p.alamat=?';
+    const taskParams = scope === 'all' ? [technicianId] : [technicianId, scope];
+    const [tasks] = await db.query(
+      `SELECT c.id,c.nomor_tiket,c.kategori,c.status,c.created_at,c.updated_at,p.nama nama_pelanggan,p.alamat wilayah
+       FROM complaints c JOIN pelanggan_salam p ON p.id=c.pelanggan_id WHERE c.teknisi_id=?${taskRegionFilter}
+       ORDER BY c.updated_at DESC,c.id DESC LIMIT 50`, taskParams,
+    );
+    const activityParams = scope === 'all' ? [technicianId] : [technicianId, scope];
+    const activityRegionFilter = scope === 'all' ? '' : ' AND p.alamat=?';
+    const [activity] = await db.query(
+      `SELECT ct.id,ct.complaint_id,ct.status,ct.judul,ct.keterangan,ct.aktor_nama,ct.created_at,
+       c.nomor_tiket,c.status status_tiket,p.nama nama_pelanggan,p.alamat wilayah
+       FROM complaint_timelines ct JOIN complaints c ON c.id=ct.complaint_id JOIN pelanggan_salam p ON p.id=c.pelanggan_id
+       WHERE c.teknisi_id=?${activityRegionFilter} ORDER BY ct.created_at DESC,ct.id DESC LIMIT 50`, activityParams,
+    );
+    return res.json({ success: true, data: { technician, tasks, activity } });
   } catch (error) { return next(error); }
 };
 

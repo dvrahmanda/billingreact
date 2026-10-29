@@ -1,5 +1,5 @@
 const { ROLES, WILAYAH_RESMI } = require('../config/constants');
-const { normalize } = require('../utils/helpers');
+const { normalize, isOfficialRegion } = require('../utils/helpers');
 
 const requireRoles = (...roles) => (req, res, next) => {
   if (req.user && roles.includes(req.user.role)) return next();
@@ -16,12 +16,16 @@ const enforceWilayahScope = (req, res, next) => {
     }
     req.wilayahScope = requested && !['ALL', 'SEMUA'].includes(requested) ? requested : 'all';
   } else {
-    req.wilayahScope = req.user?.wilayah;
+    if (req.user?.role !== ROLES.ADMIN || !isOfficialRegion(req.user?.wilayah)) {
+      return res.status(403).json({ success: false, message: 'Akun Admin Wilayah belum memiliki wilayah resmi.' });
+    }
+    req.wilayahScope = normalize(req.user.wilayah);
   }
   return next();
 };
 
 const rowAllowed = (req, wilayah) => req.user?.role === ROLES.SUPERADMIN
-  || normalize(wilayah) === normalize(req.user?.wilayah);
+  || (req.user?.role === ROLES.ADMIN && isOfficialRegion(req.user?.wilayah)
+    && normalize(wilayah) === normalize(req.user.wilayah));
 
 module.exports = { requireRoles, requireAdmin, enforceWilayahScope, rowAllowed };

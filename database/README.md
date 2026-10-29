@@ -5,7 +5,8 @@
 3. Ubah `server/.env` menjadi `DEMO_MODE=false`.
 4. Isi koneksi DB.
 5. Jika database dibuat dari schema versi sebelumnya, jalankan satu kali `migrations/001_workflow_features.sql`.
-6. Untuk database baru pengembangan, dari folder `server` jalankan `npm run seed` agar tersedia akun uji. Jangan jalankan seeder setelah data PHP dimigrasikan.
+6. Jalankan satu kali `migrations/002_technician_tracking.sql` pada database yang sudah ada untuk menambah penyimpanan lokasi teknisi.
+7. Untuk database baru pengembangan, dari folder `server` jalankan `npm run seed` agar tersedia akun uji. Jangan jalankan seeder setelah data PHP dimigrasikan.
 
 Database baru cukup mengimpor `schema_lifemedia.sql`; file migrasi hanya untuk database yang sudah ada. Backup database sebelum menjalankan migrasi.
 

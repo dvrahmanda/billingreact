@@ -9,6 +9,13 @@
     "android": { "package": "id.lifemedia.billing.technician" },
     "plugins": [
       "expo-secure-store",
+      ["expo-location", {
+        "locationWhenInUsePermission": "Lokasi digunakan untuk mengirim posisi teknisi kepada Admin saat Anda masuk.",
+        "locationAlwaysAndWhenInUsePermission": "Lokasi dibagikan kepada Admin selama akun Teknisi masuk, termasuk saat aplikasi berada di latar belakang.",
+        "isIosBackgroundLocationEnabled": true,
+        "isAndroidBackgroundLocationEnabled": true,
+        "isAndroidForegroundServiceEnabled": true
+      }],
       ["expo-image-picker", { "photosPermission": "Life Media membutuhkan akses foto untuk bukti penanganan gangguan.", "cameraPermission": "Life Media membutuhkan kamera untuk mengambil bukti penanganan gangguan." }]
     ]
   }

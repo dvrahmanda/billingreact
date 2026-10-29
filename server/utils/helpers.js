@@ -3,16 +3,20 @@ const { WILAYAH_RESMI, ROLES } = require('../config/constants');
 
 const isDemo = () => String(process.env.DEMO_MODE || 'true').toLowerCase() === 'true';
 const normalize = (value) => String(value || '').trim().toUpperCase();
+const isOfficialRegion = (value) => WILAYAH_RESMI.includes(normalize(value));
 
 function getWilayahScope(req) {
-  if (req.user?.role !== ROLES.SUPERADMIN) return req.user?.wilayah || null;
+  if (req.user?.role !== ROLES.SUPERADMIN) {
+    return isOfficialRegion(req.user?.wilayah) ? normalize(req.user.wilayah) : '__INVALID_SCOPE__';
+  }
   const requested = normalize(req.query.wilayah);
   if (!requested || requested === 'ALL' || requested === 'SEMUA') return null;
-  return WILAYAH_RESMI.includes(requested) ? requested : null;
+  return isOfficialRegion(requested) ? requested : '__INVALID_SCOPE__';
 }
 
 function scoped(req, rows, field = 'alamat') {
   const scope = getWilayahScope(req);
+  if (scope === '__INVALID_SCOPE__') return [];
   return scope ? rows.filter((row) => normalize(row[field]) === normalize(scope)) : rows;
 }
 
@@ -45,4 +49,4 @@ function paginate(rows, req) {
   };
 }
 
-module.exports = { demo, isDemo, scoped, joinCustomer, pagination, paginate, getWilayahScope, normalize };
+module.exports = { demo, isDemo, scoped, joinCustomer, pagination, paginate, getWilayahScope, normalize, isOfficialRegion };

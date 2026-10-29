@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const { fetchPPPoE } = require('../services/pppoeProxyService');
+const { fetchPPPoE, fetchPPPoESource } = require('../services/pppoeProxyService');
 const { demo, isDemo, normalize } = require('../utils/helpers');
 const { rowAllowed } = require('../middleware/roleScope');
 
@@ -11,8 +11,8 @@ const inScope = (req, rows) => {
 
 const normalizedName = (value) => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const accountCoordinates = (account) => ({
-  lat: Number(account.koordinat_x ?? account.latitude ?? account.lat ?? account.x),
-  lng: Number(account.koordinat_y ?? account.longitude ?? account.lon ?? account.lng ?? account.y),
+  lat: Number(account.latitude ?? account.lat ?? account.koordinat_y ?? account.y),
+  lng: Number(account.longitude ?? account.lng ?? account.lon ?? account.koordinat_x ?? account.x),
 });
 const distanceMeters = (a, b) => {
   const radians = (value) => value * Math.PI / 180;
@@ -35,7 +35,9 @@ function findAutoMatch(account, customers) {
   const point = accountCoordinates(account);
   if (Number.isFinite(point.lat) && Number.isFinite(point.lng) && (point.lat !== 0 || point.lng !== 0)) {
     return sameRegion.filter((customer) => {
-      const customerPoint = { lat: Number(customer.koordinat_x), lng: Number(customer.koordinat_y) };
+      const latitude = customer.koordinat_y; const longitude = customer.koordinat_x;
+      if (latitude == null || longitude == null) return false;
+      const customerPoint = { lat: Number(latitude), lng: Number(longitude) };
       return Number.isFinite(customerPoint.lat) && Number.isFinite(customerPoint.lng)
         && (customerPoint.lat !== 0 || customerPoint.lng !== 0) && distanceMeters(point, customerPoint) <= 30;
     });
@@ -141,31 +143,59 @@ exports.unmap = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
-exports.mapData = async (req, res, next) => {
+exports.readonlyMapData = async (req, res, next) => {
   try {
-    let rows;
-    if (isDemo()) {
-      const accounts = demo.pppoe;
-      rows = demo.customers.filter((customer) => customer.koordinat_x != null && customer.koordinat_y != null).map((customer) => {
-        const complaint = demo.complaints.some((item) => item.pelanggan_id === customer.id && !['closed', 'ditolak'].includes(item.status));
-        const account = accounts.find((item) => String(item.username).toLowerCase() === String(customer.pppoe_user || '').toLowerCase());
-        return { id: customer.id, nama: customer.nama, wilayah: customer.alamat, alamat_lengkap: customer.alamat_lengkap || customer.alamat, username: customer.pppoe_user, status: account?.status || customer.pppoe_status, koordinat_x: account?.koordinat_x ?? customer.koordinat_x, koordinat_y: account?.koordinat_y ?? customer.koordinat_y, complain_aktif: complaint };
-      });
-    } else {
-      const params = []; let where = 'WHERE d.koordinat_x IS NOT NULL AND d.koordinat_y IS NOT NULL';
-      const region = scopeRegion(req);
-      if (region && region !== 'all') { where += ' AND p.alamat=?'; params.push(region); }
-      [rows] = await db.query(
-        `SELECT p.id,p.nama,p.alamat wilayah,p.alamat_lengkap,d.pppoe_user username,d.koordinat_x,d.koordinat_y,
-         EXISTS(SELECT 1 FROM complaints c WHERE c.pelanggan_id=p.id AND c.status NOT IN ('closed','ditolak')) complain_aktif
-         FROM pelanggan_salam p JOIN pelanggan_detail_salam d ON d.pelanggan_id=p.id ${where}`, params,
-      );
-      const accounts = await fetchPPPoE(); const byUser = new Map(accounts.map((item) => [String(item.username).toLowerCase(), item]));
-      rows = rows.map((row) => {
-        const account = byUser.get(String(row.username || '').toLowerCase());
-        return { ...row, status: account?.status || null, koordinat_x: account?.koordinat_x ?? row.koordinat_x, koordinat_y: account?.koordinat_y ?? row.koordinat_y };
+    // Peta monitoring selalu membaca API PPPoE asli, termasuk saat Billing
+    // memakai DEMO_MODE. Endpoint ini hanya melakukan HTTP GET.
+    const sourceAccounts = inScope(req, (await fetchPPPoESource())
+      .filter((account) => account.icon == null || Number(account.icon) === 119));
+    const rows = [];
+    let withoutCoordinates = 0;
+
+    for (const account of sourceAccounts) {
+      const point = accountCoordinates(account);
+      if (!Number.isFinite(point.lat) || point.lat < -90 || point.lat > 90
+        || !Number.isFinite(point.lng) || point.lng < -180 || point.lng > 180) {
+        withoutCoordinates += 1;
+        continue;
+      }
+
+      const username = String(account.username || account.user || '').trim();
+      const region = account.wilayah || account.region || account.lokasi || account.location || account.site || 'Tidak diketahui';
+      const location = account.lokasi || account.location || account.site || account.name || account.nama || region;
+      rows.push({
+        id: String(account.id || username || `${point.lat},${point.lng}`),
+        username,
+        nama: account.customer_name || account.nama || account.name || location || username || 'Akun PPPoE',
+        customer_id: account.customer_id || account.billing?.id || null,
+        customer_name: account.customer_name || account.billing?.nama || null,
+        wilayah: region,
+        lokasi: location,
+        ip: account.ip || account.address || account['remote-address'] || '-',
+        mac: account.mac || account['caller-id'] || '-',
+        router: account.router || account.server || '-',
+        uptime: account.uptime || '-',
+        latitude: point.lat,
+        longitude: point.lng,
+        koordinat_x: point.lng,
+        koordinat_y: point.lat,
+        status: String(account.status || 'UNKNOWN').toUpperCase(),
       });
     }
-    return res.json({ success: true, data: rows });
+
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    return res.json({
+      success: true,
+      read_only: true,
+      fetched_at: new Date().toISOString(),
+      counts: {
+        total: sourceAccounts.length,
+        mapped: rows.length,
+        without_coordinates: withoutCoordinates,
+        online: sourceAccounts.filter((row) => row.status === 'ONLINE').length,
+        offline: sourceAccounts.filter((row) => row.status === 'OFFLINE').length,
+      },
+      data: rows,
+    });
   } catch (error) { return next(error); }
 };

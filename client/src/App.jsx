@@ -1,4 +1,5 @@
 import React from 'react';
+import DocumentTitle from './components/layout/DocumentTitle';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import MainLayout from './components/layout/MainLayout';
@@ -11,7 +12,6 @@ import CustomerImportPage from './pages/customers/CustomerImportPage';
 import BillListPage from './pages/billing/BillListPage';
 import BillDetailPage from './pages/billing/BillDetailPage';
 import PaymentHistoryPage from './pages/payments/PaymentHistoryPage';
-import ManualPaymentVerifyPage from './pages/payments/ManualPaymentVerifyPage';
 import PaymentMatchingPage from './pages/payments/PaymentMatchingPage';
 import PPPoEMonitoringPage from './pages/network/PPPoEMonitoringPage';
 import PPPoEMappingPage from './pages/network/PPPoEMappingPage';
@@ -26,7 +26,6 @@ import RegionalAdminPage from './pages/management/RegionalAdminPage';
 import ActivityPage from './pages/management/ActivityPage';
 import NotFoundPage from './pages/management/NotFoundPage';
 import NotificationsPage from './pages/management/NotificationsPage';
-import RegionSettingsPage from './pages/management/RegionSettingsPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -34,10 +33,17 @@ function ProtectedRoute({ children }) {
   return user && ['superadmin', 'admin'].includes(user.role) ? children : <Navigate to="/login" replace />;
 }
 
+function SuperAdminRoute({ children }) {
+  const { user } = useAuth();
+  return user?.role === 'superadmin' ? children : <Navigate to="/dashboard" replace />;
+}
+
 export default function App() {
   const { user } = useAuth();
   return (
-    <Routes>
+    <>
+      <DocumentTitle />
+      <Routes>
       <Route path="/login" element={user && ['superadmin', 'admin'].includes(user.role) ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
       <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
@@ -50,7 +56,6 @@ export default function App() {
         <Route path="billings" element={<BillListPage />} />
         <Route path="billings/:id" element={<BillDetailPage />} />
         <Route path="payments" element={<PaymentHistoryPage />} />
-        <Route path="payments/manual" element={<ManualPaymentVerifyPage />} />
         <Route path="payments/matching" element={<PaymentMatchingPage />} />
         <Route path="network/monitoring" element={<PPPoEMonitoringPage />} />
         <Route path="network/mapping" element={<PPPoEMappingPage />} />
@@ -58,15 +63,15 @@ export default function App() {
         <Route path="complaints" element={<ComplaintListPage />} />
         <Route path="complaints/:id" element={<ComplaintDetailPage />} />
         <Route path="technicians/monitoring" element={<TechnicianMonitoringPage />} />
-        <Route path="management/technicians" element={<TechnicianManagePage />} />
+        <Route path="management/technicians" element={<SuperAdminRoute><TechnicianManagePage /></SuperAdminRoute>} />
         <Route path="reports/financial" element={<FinancialReportPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
-        <Route path="management/admins" element={<RegionalAdminPage />} />
-        <Route path="management/region-settings" element={<RegionSettingsPage />} />
-        <Route path="activity" element={<ActivityPage />} />
+        <Route path="management/admins" element={<SuperAdminRoute><RegionalAdminPage /></SuperAdminRoute>} />
+        <Route path="activity" element={<SuperAdminRoute><ActivityPage /></SuperAdminRoute>} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
+    </>
   );
 }

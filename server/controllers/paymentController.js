@@ -2,9 +2,8 @@ const crypto = require('node:crypto');
 const ExcelJS = require('exceljs');
 const db = require('../config/database');
 const { demo, isDemo, normalize } = require('../utils/helpers');
-const { rowAllowed } = require('../middleware/roleScope');
 const { createTransactionToken } = require('../services/midtransService');
-const { notifyCustomer, notifyAdmins, sendWhatsApp } = require('../services/notificationService');
+const { notifyCustomer, sendWhatsApp } = require('../services/notificationService');
 const { recordActivity } = require('../services/activityService');
 
 function joinedDemo() {
@@ -47,7 +46,6 @@ function paymentResult(payment, duplicate = false) {
   if (['settlement', 'capture'].includes(gatewayStatus) && payment.status !== 'lunas') return 'Transaksi Berhasil, Perlu Diperiksa';
   if (Number(payment.nominal_dibayar) !== Number(payment.nominal_tagihan)) return 'Nominal Tidak Sesuai';
   if (payment.status === 'lunas' && payment.bill_status !== 'Lunas') return 'Transaksi Berhasil, Tagihan Belum Lunas';
-  if (payment.status === 'menunggu_verifikasi') return 'Menunggu Verifikasi Manual';
   if (payment.status === 'pending' || payment.status === 'gagal' || payment.status === 'ditolak') return 'Perlu Diperiksa';
   return 'Sesuai';
 }
@@ -120,113 +118,42 @@ async function markMidtransStatus(orderId, notification) {
 
 exports.list = async (req, res, next) => {
   try {
-    if (isDemo()) return res.json({ success: true, data: paymentScope(req, joinedDemo()) });
+    const clauses = [];
+    const params = [];
     const region = req.user.role === 'superadmin'
       ? (req.query.wilayah && !['all', 'semua'].includes(String(req.query.wilayah).toLowerCase()) ? req.query.wilayah : null)
       : req.user.wilayah;
-    const params = [];
-    const clauses = [];
     if (region) { clauses.push('c.alamat=?'); params.push(region); }
     if (req.query.status) { clauses.push('pay.status=?'); params.push(req.query.status); }
-    if (req.query.metode) { clauses.push('pay.metode=?'); params.push(req.query.metode); }
-    const [rows] = await db.query(
-      `SELECT pay.*,c.nama,c.id_pelanggan,c.alamat,b.status_bayar bill_status FROM payments pay JOIN pelanggan_salam c ON c.id=pay.pelanggan_id LEFT JOIN tagihan_salam b ON b.id=pay.tagihan_id
-       ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY pay.created_at DESC LIMIT 1000`, params,
-    );
-    return res.json({ success: true, data: rows });
-  } catch (error) { return next(error); }
-};
+    if (req.query.metode === 'Midtrans') clauses.push("pay.tipe_pembayaran='midtrans'");
+    else if (req.query.metode) { clauses.push('pay.metode=?'); params.push(req.query.metode); }
 
-exports.pending = async (req, res, next) => {
-  try {
-    if (isDemo()) return res.json({ success: true, data: paymentScope(req, joinedDemo().filter((item) => item.status === 'menunggu_verifikasi')) });
-    const region = req.user.role === 'superadmin'
-      ? (req.query.wilayah && !['all', 'semua'].includes(String(req.query.wilayah).toLowerCase()) ? req.query.wilayah : null)
-      : req.user.wilayah;
-    const params = [];
-    const clauses = ["pay.status='menunggu_verifikasi'", "pay.tipe_pembayaran='manual'"];
-    if (region) { clauses.push('c.alamat=?'); params.push(region); }
-    const [rows] = await db.query(
-      `SELECT pay.*,c.nama,c.id_pelanggan,c.alamat,b.nominal_tagihan bill_amount,b.status_bayar bill_status FROM payments pay JOIN pelanggan_salam c ON c.id=pay.pelanggan_id LEFT JOIN tagihan_salam b ON b.id=pay.tagihan_id WHERE ${clauses.join(' AND ')} ORDER BY pay.created_at`, params,
-    );
-    return res.json({ success: true, data: rows });
-  } catch (error) { return next(error); }
-};
-
-exports.verify = async (req, res, next) => {
-  try {
-    const id = Number(req.params.id);
-    const action = String(req.body.action || '');
-    const reason = String(req.body.alasan || '').trim();
-    if (!['approve', 'reject'].includes(action)) return res.status(400).json({ success: false, message: 'Aksi harus approve atau reject.' });
-    if (action === 'reject' && !reason) return res.status(400).json({ success: false, message: 'Alasan penolakan wajib diisi.' });
     if (isDemo()) {
-      const payment = demo.payments.find((item) => item.id === id);
-      const customer = payment && demo.customers.find((item) => item.id === payment.pelanggan_id);
-      if (!payment || !customer) return res.status(404).json({ success: false, message: 'Pembayaran tidak ditemukan.' });
-      if (!rowAllowed(req, customer.alamat)) return res.status(404).json({ success: false, message: 'Pembayaran tidak ditemukan.' });
-      if (payment.status !== 'menunggu_verifikasi' || payment.tipe_pembayaran !== 'manual') return res.status(409).json({ success: false, message: 'Pembayaran ini sudah diproses atau bukan pembayaran manual.' });
-      const bill = demo.bills.find((item) => item.id === payment.tagihan_id);
-      if (action === 'approve' && (!bill || Number(payment.nominal_dibayar) !== Number(bill.nominal_tagihan))) return res.status(422).json({ success: false, message: 'Nominal pembayaran harus sama dengan tagihan sebelum dapat diterima.' });
-      if (action === 'approve' && bill.status_bayar === 'Lunas') return res.status(409).json({ success: false, message: 'Tagihan sudah lunas melalui transaksi lain.' });
-      payment.status = action === 'approve' ? 'lunas' : 'ditolak';
-      payment.catatan_admin = action === 'reject' ? reason : null;
-      payment.verified_by = req.user.id; payment.verified_at = new Date().toISOString();
-      if (action === 'approve') {
-        bill.status_bayar = 'Lunas'; bill.tanggal_bayar = payment.verified_at; bill.nominal_dibayar = payment.nominal_dibayar; bill.metode_pembayaran = payment.metode || 'Transfer Manual';
-        syncDemoCustomerBill(bill);
-      }
-      const title = action === 'approve' ? 'Pembayaran diterima' : 'Pembayaran ditolak';
-      await notifyCustomer(customer.id, { jenis: 'pembayaran', judul: title, pesan: action === 'approve' ? `Pembayaran ${payment.order_id} telah diterima.` : `Pembayaran ${payment.order_id} ditolak: ${reason}`, tautan: '/payments' });
-      await sendWhatsApp(customer.nomor_pelanggan, action === 'approve' ? `Pembayaran tagihan ${payment.order_id} telah diterima.` : `Pembayaran ${payment.order_id} ditolak. Alasan: ${reason}`, { jenis: 'pembayaran_manual', wilayah: customer.alamat, idPelanggan: customer.id_pelanggan, dedupeKey: `payment-manual:${payment.id}:${payment.status}` });
-      return res.json({ success: true, data: payment });
+      let rows = paymentScope(req, joinedDemo());
+      if (req.query.status) rows = rows.filter((item) => item.status === req.query.status);
+      if (req.query.metode === 'Midtrans') rows = rows.filter((item) => item.tipe_pembayaran === 'midtrans');
+      else if (req.query.metode) rows = rows.filter((item) => item.metode === req.query.metode);
+      return res.json({ success: true, data: rows });
     }
-    const connection = await db.getConnection();
-    let customer; let payment;
-    try {
-      await connection.beginTransaction();
-      [[payment]] = await connection.query(
-        `SELECT pay.*,c.alamat,c.nama,c.nomor_pelanggan,c.id_pelanggan,b.nominal_tagihan bill_amount,b.status_bayar bill_status
-         FROM payments pay JOIN pelanggan_salam c ON c.id=pay.pelanggan_id LEFT JOIN tagihan_salam b ON b.id=pay.tagihan_id WHERE pay.id=? FOR UPDATE`, [id],
-      );
-      if (!payment || !rowAllowed(req, payment.alamat)) { await connection.rollback(); return res.status(404).json({ success: false, message: 'Pembayaran tidak ditemukan.' }); }
-      if (payment.status !== 'menunggu_verifikasi' || payment.tipe_pembayaran !== 'manual') { await connection.rollback(); return res.status(409).json({ success: false, message: 'Pembayaran ini sudah diproses atau bukan pembayaran manual.' }); }
-      customer = payment;
-      if (action === 'approve' && (!payment.tagihan_id || Number(payment.nominal_dibayar) !== Number(payment.bill_amount))) {
-        await connection.rollback(); return res.status(422).json({ success: false, message: 'Nominal pembayaran harus sama dengan tagihan sebelum dapat diterima.' });
-      }
-      let billStatus = payment.bill_status;
-      if (action === 'approve' && payment.tagihan_id) {
-        const [[lockedBill]] = await connection.query('SELECT status_bayar FROM tagihan_salam WHERE id=? FOR UPDATE', [payment.tagihan_id]);
-        billStatus = lockedBill?.status_bayar;
-      }
-      if (action === 'approve' && billStatus === 'Lunas') {
-        await connection.rollback(); return res.status(409).json({ success: false, message: 'Tagihan sudah lunas melalui transaksi lain.' });
-      }
-      await connection.query('UPDATE payments SET status=?,catatan_admin=?,verified_by=?,verified_at=NOW() WHERE id=?', [action === 'approve' ? 'lunas' : 'ditolak', action === 'reject' ? reason : null, req.user.id, id]);
-      if (action === 'approve') {
-        await connection.query("UPDATE tagihan_salam SET status_bayar='Lunas',tanggal_bayar=NOW(),nominal_dibayar=?,metode_pembayaran=? WHERE id=?", [payment.nominal_dibayar, payment.metode || 'Transfer Manual', payment.tagihan_id]);
-        await syncCustomerBill(connection, payment.tagihan_id);
-      }
-      await connection.commit();
-    } catch (error) { await connection.rollback(); throw error; } finally { connection.release(); }
-    const title = action === 'approve' ? 'Pembayaran diterima' : 'Pembayaran ditolak';
-    await notifyCustomer(payment.pelanggan_id, { jenis: 'pembayaran', judul: title, pesan: action === 'approve' ? `Pembayaran ${payment.order_id} telah diterima.` : `Pembayaran ${payment.order_id} ditolak: ${reason}`, tautan: '/payments' });
-    await sendWhatsApp(customer.nomor_pelanggan, action === 'approve' ? `Pembayaran tagihan ${payment.order_id} telah diterima.` : `Pembayaran ${payment.order_id} ditolak. Alasan: ${reason}`, { jenis: 'pembayaran_manual', wilayah: customer.alamat, idPelanggan: customer.id_pelanggan, dedupeKey: `payment-manual:${payment.id}:${action}` });
-    return res.json({ success: true });
+
+    const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
+    const [rows] = await db.query(
+      'SELECT pay.*,c.nama,c.id_pelanggan,c.alamat,b.status_bayar bill_status FROM payments pay JOIN pelanggan_salam c ON c.id=pay.pelanggan_id LEFT JOIN tagihan_salam b ON b.id=pay.tagihan_id ' + where + ' ORDER BY pay.created_at DESC LIMIT 1000',
+      params,
+    );
+    return res.json({ success: true, data: rows });
   } catch (error) { return next(error); }
 };
-
 exports.matching = async (req, res, next) => {
   try {
     let rows;
-    if (isDemo()) rows = paymentScope(req, joinedDemo());
+    if (isDemo()) rows = paymentScope(req, joinedDemo().filter((item) => item.tipe_pembayaran === 'midtrans'));
     else {
       const region = req.user.role === 'superadmin'
         ? (req.query.wilayah && !['all', 'semua'].includes(String(req.query.wilayah).toLowerCase()) ? req.query.wilayah : null)
         : req.user.wilayah;
       const params = [];
-      const where = [];
+      const where = ["pay.tipe_pembayaran='midtrans'"];
       if (region) { where.push('c.alamat=?'); params.push(region); }
       const [data] = await db.query(
         `SELECT pay.*,c.nama,c.id_pelanggan,c.alamat,b.status_bayar bill_status,b.nominal_tagihan bill_amount FROM payments pay JOIN pelanggan_salam c ON c.id=pay.pelanggan_id LEFT JOIN tagihan_salam b ON b.id=pay.tagihan_id
@@ -257,49 +184,6 @@ exports.matching = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
-exports.createManualForCustomer = async (req, res, next) => {
-  try {
-    if (!req.file) return res.status(400).json({ success: false, message: 'Bukti transfer wajib diunggah.' });
-    const billId = Number(req.body.tagihan_id);
-    const amount = Number(req.body.nominal_dibayar);
-    const method = String(req.body.metode || '').trim();
-    if (!Number.isInteger(billId) || !Number.isFinite(amount) || amount <= 0 || !method) return res.status(400).json({ success: false, message: 'Tagihan, nominal, dan metode pembayaran harus diisi dengan benar.' });
-    if (!req.user.pelanggan_id) return res.status(403).json({ success: false, message: 'Akun ini belum terhubung ke pelanggan.' });
-    const orderId = `MAN-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-    if (isDemo()) {
-      const bill = demo.bills.find((item) => item.id === billId && item.pelanggan_id === req.user.pelanggan_id);
-      if (!bill) return res.status(404).json({ success: false, message: 'Tagihan tidak ditemukan.' });
-      if (bill.status_bayar === 'Lunas') return res.status(409).json({ success: false, message: 'Tagihan sudah lunas.' });
-      if (demo.payments.some((item) => item.tagihan_id === billId && ['pending', 'menunggu_verifikasi'].includes(item.status))) return res.status(409).json({ success: false, message: 'Tagihan sudah memiliki pembayaran yang menunggu proses.' });
-      const customer = demo.customers.find((item) => item.id === req.user.pelanggan_id);
-      const payment = { id: Math.max(0, ...demo.payments.map((item) => item.id)) + 1, order_id: orderId, pelanggan_id: customer.id, tagihan_id: bill.id, periode: bill.periode, tipe_pembayaran: 'manual', metode, nominal_tagihan: bill.nominal_tagihan, nominal_dibayar: amount, status: 'menunggu_verifikasi', bukti_transfer: `/uploads/bukti_transfer/${require('node:path').basename(req.file.path)}`, created_at: new Date().toISOString() };
-      demo.payments.push(payment);
-      await notifyAdmins(customer.alamat, { jenis: 'pembayaran', judul: 'Pembayaran manual menunggu verifikasi', pesan: `${customer.nama} mengirim bukti pembayaran ${orderId}.`, tautan: '/payments/manual' });
-      return res.status(201).json({ success: true, data: payment });
-    }
-    const connection = await db.getConnection();
-    let payment;
-    try {
-      await connection.beginTransaction();
-      const [[bill]] = await connection.query('SELECT * FROM tagihan_salam WHERE id=? AND pelanggan_id=? FOR UPDATE', [billId, req.user.pelanggan_id]);
-      if (!bill) { await connection.rollback(); return res.status(404).json({ success: false, message: 'Tagihan tidak ditemukan.' }); }
-      if (bill.status_bayar === 'Lunas') { await connection.rollback(); return res.status(409).json({ success: false, message: 'Tagihan sudah lunas.' }); }
-      const [[pending]] = await connection.query("SELECT id FROM payments WHERE tagihan_id=? AND status IN ('pending','menunggu_verifikasi') LIMIT 1 FOR UPDATE", [billId]);
-      if (pending) { await connection.rollback(); return res.status(409).json({ success: false, message: 'Tagihan sudah memiliki pembayaran yang menunggu proses.' }); }
-      const [created] = await connection.query(
-        `INSERT INTO payments (order_id,pelanggan_id,tagihan_id,periode,tipe_pembayaran,metode,nominal_tagihan,nominal_dibayar,status,bukti_transfer)
-         VALUES (?,?,?,?,'manual',?,?,?,'menunggu_verifikasi',?)`,
-        [orderId, req.user.pelanggan_id, bill.id, bill.periode, method, bill.nominal_tagihan, amount, `/uploads/bukti_transfer/${require('node:path').basename(req.file.path)}`],
-      );
-      [[payment]] = await connection.query('SELECT * FROM payments WHERE id=?', [created.insertId]);
-      await connection.commit();
-    } catch (error) { await connection.rollback(); throw error; } finally { connection.release(); }
-    const [[customer]] = await db.query('SELECT nama,id_pelanggan,alamat FROM pelanggan_salam WHERE id=?', [req.user.pelanggan_id]);
-    await notifyAdmins(customer.alamat, { jenis: 'pembayaran', judul: 'Pembayaran manual menunggu verifikasi', pesan: `${customer.nama} mengirim bukti pembayaran ${orderId}.`, tautan: '/payments/manual' });
-    return res.status(201).json({ success: true, data: payment });
-  } catch (error) { return next(error); }
-};
-
 exports.createMidtransForCustomer = async (req, res, next) => {
   try {
     const billId = Number(req.body.tagihan_id);
@@ -316,7 +200,7 @@ exports.createMidtransForCustomer = async (req, res, next) => {
     if (bill.status_bayar === 'Lunas') return res.status(409).json({ success: false, message: 'Tagihan sudah lunas.' });
     const orderId = `LM-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     if (isDemo()) {
-      if (demo.payments.some((item) => item.tagihan_id === billId && ['pending', 'menunggu_verifikasi'].includes(item.status))) {
+      if (demo.payments.some((item) => item.tagihan_id === billId && item.tipe_pembayaran === 'midtrans' && item.status === 'pending')) {
         return res.status(409).json({ success: false, message: 'Tagihan sudah memiliki pembayaran yang menunggu proses.' });
       }
       const transaction = await createTransactionToken(orderId, bill.nominal_tagihan, { first_name: customer.nama, phone: customer.nomor_pelanggan });
@@ -330,7 +214,7 @@ exports.createMidtransForCustomer = async (req, res, next) => {
       const [[lockedBill]] = await connection.query('SELECT * FROM tagihan_salam WHERE id=? AND pelanggan_id=? FOR UPDATE', [billId, req.user.pelanggan_id]);
       if (!lockedBill) { await connection.rollback(); return res.status(404).json({ success: false, message: 'Tagihan tidak ditemukan.' }); }
       if (lockedBill.status_bayar === 'Lunas') { await connection.rollback(); return res.status(409).json({ success: false, message: 'Tagihan sudah lunas.' }); }
-      const [[pending]] = await connection.query("SELECT id FROM payments WHERE tagihan_id=? AND status IN ('pending','menunggu_verifikasi') LIMIT 1 FOR UPDATE", [billId]);
+      const [[pending]] = await connection.query("SELECT id FROM payments WHERE tagihan_id=? AND tipe_pembayaran='midtrans' AND status='pending' LIMIT 1 FOR UPDATE", [billId]);
       if (pending) { await connection.rollback(); return res.status(409).json({ success: false, message: 'Tagihan sudah memiliki pembayaran yang menunggu proses.' }); }
       [created] = await connection.query(
         `INSERT INTO payments (order_id,pelanggan_id,tagihan_id,periode,tipe_pembayaran,metode,nominal_tagihan,nominal_dibayar,status)
@@ -378,7 +262,7 @@ exports.midtransWebhook = async (req, res, next) => {
 exports.exportExcel = async (req, res, next) => {
   try {
     let rows;
-    if (isDemo()) rows = paymentScope(req, joinedDemo());
+    if (isDemo()) rows = paymentScope(req, joinedDemo().filter((item) => item.tipe_pembayaran === 'midtrans'));
     else {
       const region = req.user.role === 'superadmin' ? (req.query.wilayah && req.query.wilayah !== 'all' ? req.query.wilayah : null) : req.user.wilayah;
       const params = region ? [region] : [];

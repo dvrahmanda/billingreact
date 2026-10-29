@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS `tagihan_salam` (
   CONSTRAINT `fk_tagihan_pelanggan` FOREIGN KEY (`pelanggan_id`) REFERENCES `pelanggan_salam` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 5. TABEL PENGATURAN PEMBAYARAN PER WILAYAH
+-- 5. TABEL KONFIGURASI LAYANAN PER WILAYAH (CATATAN PEMBAYARAN LEGACY)
 CREATE TABLE IF NOT EXISTS `wilayah_configs` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `wilayah` VARCHAR(60) NOT NULL UNIQUE,
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS `wilayah_configs` (
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 6. TABEL METODE PEMBAYARAN WILAYAH
+-- 6. TABEL REKENING LEGACY (TIDAK DIPAKAI; PEMBAYARAN MELALUI MIDTRANS)
 CREATE TABLE IF NOT EXISTS `wilayah_payment_methods` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `wilayah_config_id` INT NOT NULL,
@@ -119,18 +119,18 @@ CREATE TABLE IF NOT EXISTS `wilayah_payment_methods` (
   CONSTRAINT `fk_wpm_config` FOREIGN KEY (`wilayah_config_id`) REFERENCES `wilayah_configs` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 7. TABEL TRANSAKSI PEMBAYARAN (MIDTRANS & MANUAL)
+-- 7. TABEL TRANSAKSI PEMBAYARAN MIDTRANS
 CREATE TABLE IF NOT EXISTS `payments` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `order_id` VARCHAR(100) NOT NULL UNIQUE,
   `pelanggan_id` INT NOT NULL,
   `tagihan_id` INT NULL,
   `periode` DATE NOT NULL,
-  `tipe_pembayaran` ENUM('midtrans', 'manual') NOT NULL,
+  `tipe_pembayaran` ENUM('midtrans') NOT NULL,
   `metode` VARCHAR(60) NULL,
   `nominal_tagihan` DECIMAL(12,2) NOT NULL,
   `nominal_dibayar` DECIMAL(12,2) NOT NULL,
-  `status` ENUM('pending', 'menunggu_verifikasi', 'lunas', 'ditolak', 'expired', 'gagal') NOT NULL DEFAULT 'pending',
+  `status` ENUM('pending', 'lunas', 'expired', 'gagal') NOT NULL DEFAULT 'pending',
   `bukti_transfer` VARCHAR(255) NULL,
   `catatan_admin` TEXT NULL,
   `verified_by` INT NULL,
@@ -159,6 +159,17 @@ CREATE TABLE IF NOT EXISTS `technicians` (
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT `fk_tech_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Lokasi terakhir yang dibagikan aplikasi teknisi.
+CREATE TABLE IF NOT EXISTS `technician_locations` (
+  `technician_id` INT PRIMARY KEY,
+  `latitude` DECIMAL(10,7) NOT NULL,
+  `longitude` DECIMAL(10,7) NOT NULL,
+  `accuracy_m` DECIMAL(8,2) NULL,
+  `recorded_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_technician_location_technician` FOREIGN KEY (`technician_id`) REFERENCES `technicians` (`id`) ON DELETE CASCADE,
+  INDEX `idx_technician_location_recorded` (`recorded_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 9. TABEL COMPLAIN GANGGUAN PELANGGAN
@@ -286,20 +297,15 @@ INSERT INTO `users` (`username`, `password`, `role`, `wilayah`, `nama_lengkap`, 
 ('admin_waduk', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'admin', 'WADUK', 'Admin Wilayah Waduk', '6282338635691')
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
--- Konfigurasi Wilayah
-INSERT INTO `wilayah_configs` (`wilayah`, `nama_layanan`, `nomor_whatsapp`, `catatan_pembayaran`) VALUES
-('BARAN', 'Billing BARAN / Life Media', '6282338635691', 'Konfirmasi pembayaran ke Admin Wilayah Baran.'),
-('GUNUNGMANUK', 'Billing GUNUNGMANUK / Life Media', '6282338635691', 'Konfirmasi pembayaran ke Admin Wilayah Gunungmanuk.'),
-('NGASEMAYU', 'Billing NGASEMAYU / Life Media', '6282338635691', 'Konfirmasi pembayaran ke Admin Wilayah Ngasemayu.'),
-('SALAM', 'Billing SALAM / Life Media', '6287839817566', 'Konfirmasi pembayaran ke Admin Wilayah Salam.'),
-('TROSARI', 'Billing TROSARI / Life Media', '6282338635691', 'Konfirmasi pembayaran ke Admin Wilayah Trosari.'),
-('WADUK', 'Billing WADUK / Life Media', '6282338635691', 'Konfirmasi pembayaran ke Admin Wilayah Waduk.')
-ON DUPLICATE KEY UPDATE `nama_layanan` = VALUES(`nama_layanan`);
-
--- Rekening Default Salam (BCA)
-INSERT INTO `wilayah_payment_methods` (`wilayah_config_id`, `jenis`, `nama`, `nomor`, `atas_nama`) 
-SELECT id, 'bank', 'BCA', '8950258552', 'Witono' FROM `wilayah_configs` WHERE `wilayah` = 'SALAM';
-
+-- Konfigurasi Layanan Wilayah
+INSERT INTO wilayah_configs (wilayah, nama_layanan, nomor_whatsapp) VALUES
+('BARAN', 'Billing BARAN / Life Media', '6282338635691'),
+('GUNUNGMANUK', 'Billing GUNUNGMANUK / Life Media', '6282338635691'),
+('NGASEMAYU', 'Billing NGASEMAYU / Life Media', '6282338635691'),
+('SALAM', 'Billing SALAM / Life Media', '6287839817566'),
+('TROSARI', 'Billing TROSARI / Life Media', '6282338635691'),
+('WADUK', 'Billing WADUK / Life Media', '6282338635691')
+ON DUPLICATE KEY UPDATE nama_layanan = VALUES(nama_layanan);
 -- Teknisi Default
 INSERT INTO `technicians` (`nama`, `nomor_whatsapp`, `wilayah_tugas`, `status`) VALUES
 ('Bambang Irawan', '6281234567891', 'SALAM', 'tersedia'),
