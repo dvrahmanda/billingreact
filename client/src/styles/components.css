@@ -309,7 +309,7 @@
 .pppoe-distribution-point-copy strong{overflow:hidden;color:var(--color-primary);font-size:12px;text-overflow:ellipsis;white-space:nowrap}
 .pppoe-distribution-point-copy span{overflow:hidden;color:var(--color-text-muted);font-size:10px;text-overflow:ellipsis;white-space:nowrap}
 .pppoe-distribution-pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--color-border-subtle)}
-.pppoe-distribution-pagination span{color:var(--color-text-muted);font-size:11px;white-space:nowrap}
+.pppoe-distribution-pagination span{flex:1;color:var(--color-text-muted);font-size:11px;text-align:center;white-space:normal}
 .pppoe-popup{position:relative}
 .pppoe-popup-status{right:0;top:1px}
 @media(max-width:1200px){.pppoe-distribution-grid{grid-template-columns:1fr}.pppoe-distribution-point-list{max-height:520px}}
@@ -344,6 +344,7 @@
 .dashboard-summary-details .danger b{color:#C64B43}
 .dashboard-summary-details .warning b{color:#AE6B0D}
 .dashboard-details-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.9fr);gap:13px}
+.dashboard-details-grid-relawan{grid-template-columns:minmax(0,1fr)}
 .dashboard-detail-card .card-header{padding:14px 17px}
 .dashboard-detail-card .card-title{font-size:12px}
 .dashboard-detail-card .card-body{padding:15px 17px}
@@ -494,6 +495,11 @@ body{font-weight:500}
 .btn-sm{font-size:12px}
 .badge{font-size:11px;font-weight:700}
 .form-control{font-size:14px;font-weight:500}
+.login-password-field{position:relative}
+.login-password-field .form-control{padding-right:46px}
+.login-password-toggle{position:absolute;top:50%;right:8px;display:grid;place-items:center;width:32px;height:32px;padding:0;transform:translateY(-50%);border:0;border-radius:7px;background:transparent;color:var(--color-text-muted);cursor:pointer}
+.login-password-toggle:hover{background:var(--color-background);color:var(--color-primary)}
+.login-password-toggle:focus-visible{outline:2px solid var(--color-secondary);outline-offset:1px}
 .alert{font-size:12px;font-weight:500}
 .notification-copy strong{font-size:12px;font-weight:700}
 .notification-copy span{font-size:12px}

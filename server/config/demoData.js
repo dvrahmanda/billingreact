@@ -5,8 +5,13 @@ const period = currentPeriod();
 
 const users = [
   {id:1,username:'superadmin',password:'admin123',role:'superadmin',wilayah:'SEMUA',nama_lengkap:'Super Admin Life Media',status:'aktif'},
-  {id:2,username:'admin_salam',password:'admin123',role:'admin',wilayah:'SALAM',nama_lengkap:'Admin Wilayah Salam',status:'aktif'},
-  {id:3,username:'admin_baran',password:'admin123',role:'admin',wilayah:'BARAN',nama_lengkap:'Admin Wilayah Baran',status:'aktif'},
+  {id:2,username:'adminwilayahsalam',password:'admin123',role:'admin',wilayah:'SALAM',nama_lengkap:'Admin Wilayah Salam',status:'aktif'},
+  {id:3,username:'adminbaran',password:'admin123',role:'relawan',wilayah:'BARAN',nama_lengkap:'Relawan Baran',status:'aktif'},
+  {id:4,username:'admingunungmanuk',password:'admin123',role:'relawan',wilayah:'GUNUNGMANUK',nama_lengkap:'Relawan Gunungmanuk',status:'aktif'},
+  {id:5,username:'adminngasemayu',password:'admin123',role:'relawan',wilayah:'NGASEMAYU',nama_lengkap:'Relawan Ngasemayu',status:'aktif'},
+  {id:6,username:'adminsalam',password:'admin123',role:'relawan',wilayah:'SALAM',nama_lengkap:'Relawan Salam',status:'aktif'},
+  {id:7,username:'admintrosari',password:'admin123',role:'relawan',wilayah:'TROSARI',nama_lengkap:'Relawan Trosari',status:'aktif'},
+  {id:8,username:'adminwaduk',password:'admin123',role:'relawan',wilayah:'WADUK',nama_lengkap:'Relawan Waduk',status:'aktif'},
   {id:20,username:'pelanggan_ayu',password:'pelanggan123',role:'pelanggan',wilayah:'SALAM',nama_lengkap:'Ayu Lestari',status:'aktif',pelanggan_id:1},
   {id:30,username:'teknisi_bambang',password:'teknisi123',role:'teknisi',wilayah:'SALAM',nama_lengkap:'Bambang Irawan',status:'aktif',technician_id:1},
 ];
@@ -62,8 +67,8 @@ const complaints = [
 
 const activity = [
  {id:1,username:'superadmin',role:'superadmin',wilayah:'SEMUA',aksi:'LOGIN',entitas:'auth',rincian:'Login ke sistem',created_at:iso(0)},
- {id:2,username:'admin_salam',role:'admin',wilayah:'SALAM',aksi:'VERIFIKASI',entitas:'complaint',rincian:'Memverifikasi CMP-202610-001',created_at:iso(-1)},
- {id:3,username:'admin_salam',role:'admin',wilayah:'SALAM',aksi:'ASSIGN',entitas:'technician',rincian:'Menugaskan Bambang Irawan',created_at:iso(-1)}
+ {id:2,username:'adminwilayahsalam',role:'admin',wilayah:'SALAM',aksi:'VERIFIKASI',entitas:'complaint',rincian:'Memverifikasi CMP-202610-001',created_at:iso(-1)},
+ {id:3,username:'adminwilayahsalam',role:'admin',wilayah:'SALAM',aksi:'ASSIGN',entitas:'technician',rincian:'Menugaskan Bambang Irawan',created_at:iso(-1)}
 ];
 
 const notifications = [];

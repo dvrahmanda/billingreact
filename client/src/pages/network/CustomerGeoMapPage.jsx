@@ -41,6 +41,11 @@ function escapeHtml(value) {
   }[character]));
 }
 
+function accountKey(row, fallback = '') {
+  const username = String(row.username || row.user || '').trim().toLowerCase();
+  return username ? `username:${username}` : `id:${String(row.id || fallback)}`;
+}
+
 function markerPopup(row) {
   const status = String(row.status || 'UNKNOWN').toUpperCase();
   const tone = status === 'ONLINE' ? 'online' : status === 'OFFLINE' ? 'offline' : 'unknown';
@@ -77,6 +82,7 @@ export default function CustomerGeoMapPage() {
   const [leafletReady, setLeafletReady] = useState(false);
   const [leafletError, setLeafletError] = useState('');
   const mapElement = useRef(null);
+  const pointListRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
   const markersRef = useRef(new Map());
@@ -139,9 +145,14 @@ export default function CustomerGeoMapPage() {
     });
   }, [rows, search, statusFilter]);
   const totalPages = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
-  const pageRows = visibleRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageStart = (page - 1) * PAGE_SIZE;
+  const pageRows = visibleRows.slice(pageStart, pageStart + PAGE_SIZE);
+  const pageEnd = pageStart + pageRows.length;
 
   useEffect(() => setPage((value) => Math.min(value, totalPages)), [totalPages]);
+  useEffect(() => {
+    if (pointListRef.current) pointListRef.current.scrollTop = 0;
+  }, [page]);
 
   useEffect(() => {
     if (!leafletReady || !mapElement.current || mapRef.current) return undefined;
@@ -183,7 +194,7 @@ export default function CustomerGeoMapPage() {
         title: row.username || row.nama || 'Akun PPPoE',
       }).bindPopup(markerPopup({ ...row, latitude, longitude }), { maxWidth: 320 });
       marker.addTo(layer);
-      markersRef.current.set(String(row.id || row.username || index), marker);
+      markersRef.current.set(accountKey(row, index), marker);
       bounds.push(point);
     });
     if (!firstViewportSet.current && !loading && !error) {
@@ -196,7 +207,7 @@ export default function CustomerGeoMapPage() {
 
   const focusPoint = (row) => {
     const map = mapRef.current;
-    const marker = markersRef.current.get(String(row.id || row.username));
+    const marker = markersRef.current.get(accountKey(row));
     if (!map || !marker) return;
     const point = marker.getLatLng();
     map.setView(point, Math.max(map.getZoom(), 16), { animate: true });
@@ -268,10 +279,10 @@ export default function CustomerGeoMapPage() {
             <div className="screen-center" style={{ minHeight: 180 }}><div className="spinner" /></div>
           ) : pageRows.length ? (
             <>
-              <div className="pppoe-distribution-point-list">
+              <div ref={pointListRef} className="pppoe-distribution-point-list">
                 {pageRows.map((row, index) => (
-                  <button type="button" key={row.id || row.username || index} className="pppoe-distribution-point" onClick={() => focusPoint(row)}>
-                    <span className="map-customer-number">{(page - 1) * PAGE_SIZE + index + 1}</span>
+                  <button type="button" key={accountKey(row, index)} className="pppoe-distribution-point" onClick={() => focusPoint(row)}>
+                    <span className="map-customer-number">{pageStart + index + 1}</span>
                     <span className="pppoe-distribution-point-copy">
                       <strong>{row.username || row.nama || 'Akun PPPoE'}</strong>
                       <span>{row.customer_name ? `Pelanggan: ${row.customer_name} | ` : ''}{row.lokasi || row.wilayah || 'Lokasi tidak diketahui'}</span>
@@ -285,7 +296,7 @@ export default function CustomerGeoMapPage() {
               {visibleRows.length > PAGE_SIZE && (
                 <div className="pppoe-distribution-pagination">
                   <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Sebelumnya</Button>
-                  <span>Halaman {page} dari {totalPages}</span>
+                  <span>Data { (pageStart + 1).toLocaleString('id-ID') }–{pageEnd.toLocaleString('id-ID')} dari {visibleRows.length.toLocaleString('id-ID')} · Halaman {page}/{totalPages}</span>
                   <Button variant="secondary" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Berikutnya</Button>
                 </div>
               )}

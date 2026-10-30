@@ -3,8 +3,8 @@ const db = require('../config/database');
 const { demo, isDemo, isOfficialRegion, normalize } = require('../utils/helpers');
 
 const rejectAdminWithoutRegion = (user, res) => {
-  if (user.role === 'admin' && !isOfficialRegion(user.wilayah)) {
-    res.status(403).json({ success: false, message: 'Akun Admin Wilayah belum memiliki wilayah resmi.' });
+  if (['admin', 'relawan'].includes(user.role) && !isOfficialRegion(user.wilayah)) {
+    res.status(403).json({ success: false, message: 'Akun wajib memiliki wilayah resmi.' });
     return true;
   }
   return false;
@@ -32,7 +32,7 @@ module.exports = async (req, res, next) => {
     const [[current]] = await db.query("SELECT id,username,role,wilayah,nama_lengkap,status FROM users WHERE id=?", [claims.id]);
     if (!current || current.status !== 'aktif') return res.status(401).json({ success: false, message: 'Akun tidak aktif atau tidak ditemukan.' });
     const role = String(current.role || '').trim().toLowerCase();
-    const wilayah = role === 'admin' ? normalize(current.wilayah) : current.wilayah;
+    const wilayah = ['admin', 'relawan'].includes(role) ? normalize(current.wilayah) : current.wilayah;
     const user = { ...claims, username: current.username, role, wilayah, nama_lengkap: current.nama_lengkap, pelanggan_id: null, technician_id: null };
     if (role === 'pelanggan') {
       const [[customer]] = await db.query('SELECT id,alamat FROM pelanggan_salam WHERE user_id=? LIMIT 1', [current.id]);

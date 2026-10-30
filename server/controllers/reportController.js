@@ -6,9 +6,7 @@ const { periodDate } = require('../utils/dates');
 function filters(req) {
   const clauses = [];
   const params = [];
-  const region = req.user.role === 'superadmin'
-    ? (req.wilayahScope && req.wilayahScope !== 'all' ? req.wilayahScope : null)
-    : req.wilayahScope;
+  const region = req.wilayahScope && req.wilayahScope !== 'all' ? req.wilayahScope : null;
   if (region) { clauses.push('t.alamat_snapshot=?'); params.push(region); }
   if (req.query.periode) { clauses.push('t.periode=?'); params.push(periodDate(req.query.periode)); }
   if (req.query.date_from) { clauses.push('t.periode>=?'); params.push(req.query.date_from); }

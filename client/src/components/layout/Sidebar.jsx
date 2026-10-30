@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { formatWilayahName } from '../../utils/formatters';
 import {
   Activity,
   Bell,
@@ -44,6 +45,7 @@ export default function Sidebar({ open, collapsed, onNavigate, onToggleSidebar }
   const { user, logout } = useAuth();
   const location = useLocation();
   const isSuper = user?.role === 'superadmin';
+  const isRelawan = user?.role === 'relawan';
 
   const groups = [
     {
@@ -61,7 +63,7 @@ export default function Sidebar({ open, collapsed, onNavigate, onToggleSidebar }
       icon: CreditCard,
       items: [
         { to: '/payments', icon: CreditCard, label: 'Riwayat Pembayaran', end: true },
-        { to: '/payments/matching', icon: CheckCheck, label: 'Pencocokan Pembayaran' },
+        ...(!isRelawan ? [{ to: '/payments/matching', icon: CheckCheck, label: 'Pencocokan Pembayaran' }] : []),
       ],
     },
     {
@@ -94,20 +96,23 @@ export default function Sidebar({ open, collapsed, onNavigate, onToggleSidebar }
     },
   ];
 
-  if (isSuper) {
+  if (isSuper || user?.role === 'admin') {
     groups.push({
       id: 'system',
       label: 'Manajemen Sistem',
       icon: Settings2,
       items: [
-        { to: '/management/admins', icon: ShieldCheck, label: 'Admin Wilayah' },
-        { to: '/management/technicians', icon: Wrench, label: 'Data Teknisi' },
-        { to: '/activity', icon: Activity, label: 'Activity Log' },
+        { to: '/management/admins', icon: ShieldCheck, label: 'Admin per Wilayah' },
+        ...(isSuper ? [
+          { to: '/management/technicians', icon: Wrench, label: 'Data Teknisi' },
+          { to: '/activity', icon: Activity, label: 'Activity Log' },
+        ] : []),
       ],
     });
   }
 
-  const activeGroup = groups.find((group) => group.items.some((item) => isWithin(location.pathname, item.to)))?.id || null;
+  const visibleGroups = isRelawan ? groups.filter((group) => ['billing', 'payments'].includes(group.id)) : groups;
+  const activeGroup = visibleGroups.find((group) => group.items.some((item) => isWithin(location.pathname, item.to)))?.id || null;
   const [expandedGroup, setExpandedGroup] = useState(activeGroup);
 
   useEffect(() => {
@@ -123,14 +128,14 @@ export default function Sidebar({ open, collapsed, onNavigate, onToggleSidebar }
             {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
           </button>
         </div>
-        <span className="role-chip">{isSuper ? 'SUPER ADMIN' : 'ADMIN ' + (user?.wilayah || '')}</span>
+        <span className="role-chip">{isSuper ? 'SUPER ADMIN' : isRelawan ? `ADMIN ${formatWilayahName(user?.wilayah).toUpperCase()}` : `ADMIN WILAYAH ${formatWilayahName(user?.wilayah).toUpperCase()}`}</span>
       </div>
 
       <nav className="sidebar-nav" aria-label="Navigasi utama">
         <div className="nav-section-title">MENU</div>
         <Item to="/dashboard" icon={LayoutDashboard} label="Dashboard" onClick={onNavigate} end />
 
-        {groups.map((group) => {
+        {visibleGroups.map((group) => {
           const Icon = group.icon;
           const expanded = expandedGroup === group.id;
           const active = activeGroup === group.id;

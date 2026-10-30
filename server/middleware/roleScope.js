@@ -7,17 +7,18 @@ const requireRoles = (...roles) => (req, res, next) => {
 };
 
 const requireAdmin = requireRoles(ROLES.SUPERADMIN, ROLES.ADMIN);
+const requireBillingAccess = requireRoles(ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.RELAWAN);
 
 const enforceWilayahScope = (req, res, next) => {
-  if (req.user?.role === ROLES.SUPERADMIN) {
+  if ([ROLES.SUPERADMIN, ROLES.ADMIN].includes(req.user?.role)) {
     const requested = normalize(req.query.wilayah);
     if (requested && !['ALL', 'SEMUA'].includes(requested) && !WILAYAH_RESMI.includes(requested)) {
       return res.status(400).json({ success: false, message: 'Wilayah tidak dikenal.' });
     }
     req.wilayahScope = requested && !['ALL', 'SEMUA'].includes(requested) ? requested : 'all';
   } else {
-    if (req.user?.role !== ROLES.ADMIN || !isOfficialRegion(req.user?.wilayah)) {
-      return res.status(403).json({ success: false, message: 'Akun Admin Wilayah belum memiliki wilayah resmi.' });
+    if (req.user?.role !== ROLES.RELAWAN || !isOfficialRegion(req.user?.wilayah)) {
+      return res.status(403).json({ success: false, message: 'Akun wajib memiliki wilayah resmi.' });
     }
     req.wilayahScope = normalize(req.user.wilayah);
   }
@@ -25,7 +26,8 @@ const enforceWilayahScope = (req, res, next) => {
 };
 
 const rowAllowed = (req, wilayah) => req.user?.role === ROLES.SUPERADMIN
-  || (req.user?.role === ROLES.ADMIN && isOfficialRegion(req.user?.wilayah)
+  || (req.user?.role === ROLES.ADMIN && isOfficialRegion(wilayah))
+  || (req.user?.role === ROLES.RELAWAN && isOfficialRegion(req.user?.wilayah)
     && normalize(wilayah) === normalize(req.user.wilayah));
 
-module.exports = { requireRoles, requireAdmin, enforceWilayahScope, rowAllowed };
+module.exports = { requireRoles, requireAdmin, requireBillingAccess, enforceWilayahScope, rowAllowed };

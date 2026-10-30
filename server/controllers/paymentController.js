@@ -15,11 +15,22 @@ function joinedDemo() {
 }
 
 function paymentScope(req, rows) {
-  if (req.user.role === 'superadmin') {
-    const region = req.query.wilayah && !['all', 'semua'].includes(String(req.query.wilayah).toLowerCase()) ? normalize(req.query.wilayah) : null;
-    return region ? rows.filter((row) => normalize(row.alamat) === region) : rows;
-  }
-  return rows.filter((row) => normalize(row.alamat) === normalize(req.user.wilayah));
+  const region = req.wilayahScope && req.wilayahScope !== 'all' ? normalize(req.wilayahScope) : null;
+  return region ? rows.filter((row) => normalize(row.alamat) === region) : rows;
+}
+
+function paymentForRelawan(payment) {
+  return {
+    order_id: payment.order_id,
+    nama: payment.nama,
+    id_pelanggan: payment.id_pelanggan,
+    alamat: payment.alamat,
+    tipe_pembayaran: payment.tipe_pembayaran,
+    metode: payment.metode,
+    nominal_dibayar: payment.nominal_dibayar,
+    status: payment.status,
+    created_at: payment.created_at,
+  };
 }
 
 function syncDemoCustomerBill(bill) {
@@ -120,9 +131,7 @@ exports.list = async (req, res, next) => {
   try {
     const clauses = [];
     const params = [];
-    const region = req.user.role === 'superadmin'
-      ? (req.query.wilayah && !['all', 'semua'].includes(String(req.query.wilayah).toLowerCase()) ? req.query.wilayah : null)
-      : req.user.wilayah;
+    const region = req.wilayahScope && req.wilayahScope !== 'all' ? req.wilayahScope : null;
     if (region) { clauses.push('c.alamat=?'); params.push(region); }
     if (req.query.status) { clauses.push('pay.status=?'); params.push(req.query.status); }
     if (req.query.metode === 'Midtrans') clauses.push("pay.tipe_pembayaran='midtrans'");
@@ -133,6 +142,7 @@ exports.list = async (req, res, next) => {
       if (req.query.status) rows = rows.filter((item) => item.status === req.query.status);
       if (req.query.metode === 'Midtrans') rows = rows.filter((item) => item.tipe_pembayaran === 'midtrans');
       else if (req.query.metode) rows = rows.filter((item) => item.metode === req.query.metode);
+      if (req.user.role === 'relawan') rows = rows.map(paymentForRelawan);
       return res.json({ success: true, data: rows });
     }
 
@@ -141,7 +151,7 @@ exports.list = async (req, res, next) => {
       'SELECT pay.*,c.nama,c.id_pelanggan,c.alamat,b.status_bayar bill_status FROM payments pay JOIN pelanggan_salam c ON c.id=pay.pelanggan_id LEFT JOIN tagihan_salam b ON b.id=pay.tagihan_id ' + where + ' ORDER BY pay.created_at DESC LIMIT 1000',
       params,
     );
-    return res.json({ success: true, data: rows });
+    return res.json({ success: true, data: req.user.role === 'relawan' ? rows.map(paymentForRelawan) : rows });
   } catch (error) { return next(error); }
 };
 exports.matching = async (req, res, next) => {
@@ -149,9 +159,7 @@ exports.matching = async (req, res, next) => {
     let rows;
     if (isDemo()) rows = paymentScope(req, joinedDemo().filter((item) => item.tipe_pembayaran === 'midtrans'));
     else {
-      const region = req.user.role === 'superadmin'
-        ? (req.query.wilayah && !['all', 'semua'].includes(String(req.query.wilayah).toLowerCase()) ? req.query.wilayah : null)
-        : req.user.wilayah;
+      const region = req.wilayahScope && req.wilayahScope !== 'all' ? req.wilayahScope : null;
       const params = [];
       const where = ["pay.tipe_pembayaran='midtrans'"];
       if (region) { where.push('c.alamat=?'); params.push(region); }
@@ -264,7 +272,7 @@ exports.exportExcel = async (req, res, next) => {
     let rows;
     if (isDemo()) rows = paymentScope(req, joinedDemo().filter((item) => item.tipe_pembayaran === 'midtrans'));
     else {
-      const region = req.user.role === 'superadmin' ? (req.query.wilayah && req.query.wilayah !== 'all' ? req.query.wilayah : null) : req.user.wilayah;
+      const region = req.wilayahScope && req.wilayahScope !== 'all' ? req.wilayahScope : null;
       const params = region ? [region] : [];
       [rows] = await db.query(`SELECT pay.*,c.nama,c.id_pelanggan,c.alamat FROM payments pay JOIN pelanggan_salam c ON c.id=pay.pelanggan_id ${region ? 'WHERE c.alamat=?' : ''} ORDER BY pay.created_at DESC`, params);
     }

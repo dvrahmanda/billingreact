@@ -49,6 +49,18 @@ exports.dashboard = async (req, res, next) => {
       const ids = new Set(customers.map((customer) => customer.id));
       const bills = demo.bills.filter((bill) => ids.has(bill.pelanggan_id) && bill.periode === period);
       const currentPayments = demo.payments.filter((payment) => ids.has(payment.pelanggan_id) && payment.status === 'lunas' && payment.periode === period);
+      if (req.user.role === 'relawan') {
+        return res.json({ success: true, data: { period, stats: {
+          totalPelanggan: customers.length,
+          pelangganAktif: customers.filter((item) => item.status_pelanggan === 'Aktif').length,
+          pelangganTidakAktif: customers.filter((item) => item.status_pelanggan !== 'Aktif').length,
+          totalTagihan: bills.length,
+          lunas: bills.filter((item) => item.status_bayar === 'Lunas').length,
+          belumLunas: bills.filter((item) => item.status_bayar !== 'Lunas').length,
+          totalTunggakan: bills.filter((item) => item.status_bayar !== 'Lunas').reduce((sum, item) => sum + Number(item.nominal_tagihan), 0),
+          totalPembayaran: currentPayments.reduce((sum, item) => sum + Number(item.nominal_dibayar), 0),
+        }, recentComplaints: [] } });
+      }
       const complaints = demo.complaints.filter((item) => ids.has(item.pelanggan_id));
       const activeComplaints = complaints.filter((item) => !['closed', 'ditolak'].includes(item.status));
       const pppoe = demo.pppoe.filter((item) => !region || normalize(item.wilayah) === normalize(region));
@@ -94,6 +106,18 @@ exports.dashboard = async (req, res, next) => {
       "SELECT COALESCE(SUM(CASE WHEN pay.status='lunas' AND pay.tipe_pembayaran='midtrans' THEN pay.nominal_dibayar ELSE 0 END),0) totalPembayaran FROM payments pay JOIN pelanggan_salam c ON c.id=pay.pelanggan_id " + paymentWhere,
       paymentParams,
     );
+    if (req.user.role === 'relawan') {
+      return res.json({ success: true, data: { period, stats: {
+        totalPelanggan: Number(customerStats.totalPelanggan || 0),
+        pelangganAktif: Number(customerStats.pelangganAktif || 0),
+        pelangganTidakAktif: Number(customerStats.pelangganTidakAktif || 0),
+        totalTagihan: Number(billStats.totalTagihan || 0),
+        lunas: Number(billStats.lunas || 0),
+        belumLunas: Number(billStats.belumLunas || 0),
+        totalTunggakan: Number(billStats.totalTunggakan || 0),
+        totalPembayaran: Number(paymentStats.totalPembayaran || 0),
+      }, recentComplaints: [] } });
+    }
     const [[complaintStats]] = await db.query(
       `SELECT SUM(c.status NOT IN ('closed','ditolak')) complainAktif,SUM(c.status='menunggu_verifikasi') complainBaru,COUNT(DISTINCT CASE WHEN c.status NOT IN ('closed','ditolak') THEN c.teknisi_id END) teknisiBertugas FROM complaints c JOIN pelanggan_salam p ON p.id=c.pelanggan_id ${complaintWhere.replaceAll('c.alamat', 'p.alamat')}`,
       complaintParams,
@@ -141,11 +165,19 @@ exports.detail = async (req, res, next) => {
     if (isDemo()) {
       const bill = demo.bills.find((item) => item.id === Number(req.params.id));
       if (!bill || !rowAllowed(req, bill.alamat_snapshot)) return res.status(404).json({ success: false, message: 'Tagihan tidak ditemukan.' });
-      return res.json({ success: true, data: { ...bill, payments: demo.payments.filter((item) => item.tagihan_id === bill.id) } });
+      const payments = demo.payments.filter((item) => item.tagihan_id === bill.id);
+      return res.json({ success: true, data: { ...bill, payments: req.user.role === 'relawan'
+        ? payments.map(({ order_id, nominal_dibayar, metode, status, created_at }) => ({ order_id, nominal_dibayar, metode, status, created_at }))
+        : payments } });
     }
     const [[bill]] = await db.query('SELECT * FROM tagihan_salam WHERE id=?', [req.params.id]);
     if (!bill || !rowAllowed(req, bill.alamat_snapshot)) return res.status(404).json({ success: false, message: 'Tagihan tidak ditemukan.' });
-    const [payments] = await db.query('SELECT * FROM payments WHERE tagihan_id=? ORDER BY created_at DESC', [bill.id]);
+    const [payments] = await db.query(
+      req.user.role === 'relawan'
+        ? 'SELECT order_id,nominal_dibayar,metode,status,created_at FROM payments WHERE tagihan_id=? ORDER BY created_at DESC'
+        : 'SELECT * FROM payments WHERE tagihan_id=? ORDER BY created_at DESC',
+      [bill.id],
+    );
     return res.json({ success: true, data: { ...bill, payments } });
   } catch (error) { return next(error); }
 };
@@ -153,7 +185,7 @@ exports.detail = async (req, res, next) => {
 exports.generate = async (req, res, next) => {
   try {
     const period = periodDate(req.body.periode);
-    const result = await processMonthlyBilling(period, req.user.role === 'superadmin' ? req.body.wilayah : req.user.wilayah);
+    const result = await processMonthlyBilling(period, req.user.role === 'relawan' ? req.user.wilayah : req.body.wilayah || null);
     return res.json({ success: true, data: { period, ...result } });
   } catch (error) { return next(error); }
 };

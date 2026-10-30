@@ -10,6 +10,21 @@ const LOCATION_TASK = 'life-media-technician-location';
 const transitions = { ditugaskan: ['menuju_lokasi'], menuju_lokasi: ['menuju_lokasi', 'dalam_penanganan'], dalam_penanganan: ['dalam_penanganan', 'menunggu_material', 'penanganan_selesai'], menunggu_material: ['menunggu_material', 'dalam_penanganan'] };
 const label = (value) => String(value || '-').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 const date = (value) => value ? new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+const taskCoordinates = (task) => {
+  const latitude = Number(task?.koordinat_y); const longitude = Number(task?.koordinat_x);
+  return task?.koordinat_y != null && task.koordinat_y !== '' && task?.koordinat_x != null && task.koordinat_x !== ''
+    && Number.isFinite(latitude) && latitude >= -90 && latitude <= 90
+    && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180
+    ? { latitude, longitude }
+    : null;
+};
+const googleMapsUrl = (task) => {
+  const coordinates = taskCoordinates(task);
+  const destination = coordinates
+    ? `${coordinates.latitude},${coordinates.longitude}`
+    : [task?.alamat_lengkap, task?.alamat].filter((value, index, values) => value && values.indexOf(value) === index).join(', ');
+  return destination ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}` : null;
+};
 
 async function request(path, token, options = {}) {
   const headers = { ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) };
@@ -190,6 +205,8 @@ export default function App() {
   const active = tasks.filter((item) => !['closed', 'ditolak', 'penanganan_selesai'].includes(item.status));
   const fileUri = (path) => path ? `${API.replace('/api', '')}/files/${String(path).replace(/^\/?uploads\//, '')}` : null;
   const unread = notifications.filter((item) => !item.dibaca_pada).length;
+  const selectedCoordinates = taskCoordinates(selected);
+  const selectedMapsUrl = googleMapsUrl(selected);
 
   return <View style={styles.page}>
     <View style={styles.header}><View><Text style={styles.headerEyebrow}>LIFE MEDIA · TEKNISI</Text><Text style={styles.headerTitle}>{selected?.teknisi_nama || 'Tugas Lapangan'}</Text></View><TouchableOpacity onPress={logout}><Text style={styles.logout}>Keluar</Text></TouchableOpacity></View>
@@ -201,7 +218,8 @@ export default function App() {
         {selected && <>
           <View style={styles.inline}><Button title="← Daftar Tugas" kind="outline" onPress={() => setSelected(null)} /><Pill value={selected.status} /></View>
           <View style={styles.card}><Text style={styles.cardTitle}>{selected.nomor_tiket} · {selected.nama}</Text><Text style={styles.muted}>{selected.id_pelanggan} · {label(selected.kategori)}</Text><Text style={styles.bodyText}>{selected.deskripsi}</Text><Text style={styles.bodyText}>Alamat: {selected.alamat_lengkap || selected.alamat}</Text>
-            <View style={styles.inline}><Button title="Hubungi WhatsApp" kind="outline" onPress={() => selected.nomor_pelanggan && Linking.openURL(`https://wa.me/${String(selected.nomor_pelanggan).replace(/\D/g, '')}`)} /><Button title="Buka Peta" kind="outline" onPress={() => selected.koordinat_y && selected.koordinat_x && Linking.openURL(`https://www.openstreetmap.org/?mlat=${selected.koordinat_y}&mlon=${selected.koordinat_x}#map=17/${selected.koordinat_y}/${selected.koordinat_x}`)} /></View>
+            {selectedCoordinates ? <Text style={styles.muted}>Koordinat: {selectedCoordinates.latitude.toFixed(6)}, {selectedCoordinates.longitude.toFixed(6)}</Text> : <Text style={styles.muted}>Koordinat GPS belum tersedia; Google Maps akan mencari berdasarkan alamat.</Text>}
+            <View style={styles.inline}><Button title="Hubungi WhatsApp" kind="outline" onPress={() => selected.nomor_pelanggan && Linking.openURL(`https://wa.me/${String(selected.nomor_pelanggan).replace(/\D/g, '')}`)} /><Button title="Buka Google Maps" kind="outline" disabled={!selectedMapsUrl} onPress={() => selectedMapsUrl && Linking.openURL(selectedMapsUrl).catch(() => Alert.alert('Google Maps tidak dapat dibuka', 'Periksa koneksi internet atau aplikasi peta di perangkat.'))} /></View>
             <Section title="Koneksi PPPoE" />{[['Username', selected.pppoe_user], ['Status', selected.pppoe_status], ['IP', selected.pppoe_ip], ['MAC', selected.pppoe_mac], ['Router', selected.pppoe_router], ['Uptime', selected.pppoe_uptime]].map(([key, value]) => <View key={key} style={styles.infoRow}><Text style={styles.muted}>{key}</Text><Text style={styles.infoValue}>{value || '-'}</Text></View>)}
             {selected.foto_kendala && <><Section title="Foto Gangguan" /><Image source={{ uri: fileUri(selected.foto_kendala), headers: { Authorization: `Bearer ${token}` } }} style={styles.preview} /></>}
             {selected.foto_hasil_penanganan && <><Section title="Foto Penanganan" /><Image source={{ uri: fileUri(selected.foto_hasil_penanganan), headers: { Authorization: `Bearer ${token}` } }} style={styles.preview} /></>}

@@ -4,8 +4,11 @@ import Button from '../../components/common/Button';
 import DataTable from '../../components/common/DataTable';
 import Badge, { statusVariant } from '../../components/common/Badge';
 import { formatRupiah, formatDateIndo, labelStatus } from '../../utils/formatters';
+import { useAuth } from '../../context/AuthContext';
 
 export default function PaymentHistoryPage() {
+  const { user } = useAuth();
+  const isRelawan = user?.role === 'relawan';
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
@@ -32,8 +35,8 @@ export default function PaymentHistoryPage() {
 
   return <div className="page-container">
     <div className="page-header">
-      <div><h1>Riwayat Pembayaran</h1><p>Pembayaran pelanggan dilakukan melalui Midtrans. Transaksi manual lama, jika ada, hanya ditampilkan sebagai arsip.</p></div>
-      <Button variant="outline" onClick={() => apiDownload('/payments/export', 'pembayaran.xlsx').catch((error) => alert(error.friendlyMessage || 'Export gagal.'))}>Export Excel</Button>
+      <div><h1>Riwayat Pembayaran</h1><p>{isRelawan?'Riwayat pembayaran pelanggan di wilayah tugas.':'Pembayaran pelanggan dilakukan melalui Midtrans. Transaksi manual lama, jika ada, hanya ditampilkan sebagai arsip.'}</p></div>
+      {!isRelawan&&<Button variant="outline" onClick={() => apiDownload('/payments/export', 'pembayaran.xlsx').catch((error) => alert(error.friendlyMessage || 'Export gagal.'))}>Export Excel</Button>}
     </div>
     <div className="filter-bar">
       <select className="form-control" style={{ width: 220 }} value={status} onChange={(event) => setStatus(event.target.value)}>

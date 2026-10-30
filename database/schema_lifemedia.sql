@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `username` VARCHAR(60) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
-  `role` ENUM('superadmin', 'admin', 'teknisi', 'pelanggan') NOT NULL DEFAULT 'admin',
+  `role` ENUM('superadmin', 'admin', 'relawan', 'teknisi', 'pelanggan') NOT NULL DEFAULT 'admin',
   `wilayah` VARCHAR(60) NOT NULL DEFAULT 'SEMUA',
   `nama_lengkap` VARCHAR(120) NULL,
   `nomor_telepon` VARCHAR(30) NULL,
@@ -289,12 +289,13 @@ CREATE TABLE IF NOT EXISTS `notification_delivery_keys` (
 
 INSERT INTO `users` (`username`, `password`, `role`, `wilayah`, `nama_lengkap`, `nomor_telepon`) VALUES
 ('superadmin', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'superadmin', 'SEMUA', 'Super Admin Life Media', '6287839817566'),
-('admin_baran', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'admin', 'BARAN', 'Admin Wilayah Baran', '6282338635691'),
-('admin_gunungmanuk', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'admin', 'GUNUNGMANUK', 'Admin Wilayah Gunungmanuk', '6282338635691'),
-('admin_ngasemayu', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'admin', 'NGASEMAYU', 'Admin Wilayah Ngasemayu', '6282338635691'),
-('admin_salam', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'admin', 'SALAM', 'Admin Wilayah Salam', '6287839817566'),
-('admin_trosari', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'admin', 'TROSARI', 'Admin Wilayah Trosari', '6282338635691'),
-('admin_waduk', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'admin', 'WADUK', 'Admin Wilayah Waduk', '6282338635691')
+('adminwilayahsalam', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'admin', 'SALAM', 'Admin Wilayah Salam', '6287839817566'),
+('adminbaran', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'relawan', 'BARAN', 'Relawan Baran', '6282338635691'),
+('admingunungmanuk', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'relawan', 'GUNUNGMANUK', 'Relawan Gunungmanuk', '6282338635691'),
+('adminngasemayu', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'relawan', 'NGASEMAYU', 'Relawan Ngasemayu', '6282338635691'),
+('adminsalam', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'relawan', 'SALAM', 'Relawan Salam', '6287839817566'),
+('admintrosari', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'relawan', 'TROSARI', 'Relawan Trosari', '6282338635691'),
+('adminwaduk', '$2y$10$vY35K197kH3qIkgbJ1V20e85mN6H44U6qXFp14T11N53f22lZ4C1e', 'relawan', 'WADUK', 'Relawan Waduk', '6282338635691')
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
 -- Konfigurasi Layanan Wilayah

@@ -14,3 +14,16 @@ export const formatDateIndo = (value, withTime = false) => {
 
 export const labelStatus = (value='') =>
   String(value).replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+export const formatWilayahName = (value = '') =>
+  String(value).trim().toLowerCase().replace(/(^|[\s-])([a-z])/g, (_, separator, letter) => separator + letter.toUpperCase());
+
+export const displayUserName = (user) => user?.role === 'relawan'
+  ? `Admin ${formatWilayahName(user.wilayah)}`.trim()
+  : user?.nama_lengkap || user?.username || '';
+
+export const displayUserRole = (user) => user?.role === 'superadmin'
+  ? 'Super Admin'
+  : user?.role === 'relawan'
+    ? 'Admin per Wilayah'
+    : `Admin Wilayah ${formatWilayahName(user?.wilayah)}`.trim();

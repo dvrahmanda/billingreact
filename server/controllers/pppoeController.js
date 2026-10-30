@@ -3,7 +3,7 @@ const { fetchPPPoE, fetchPPPoESource } = require('../services/pppoeProxyService'
 const { demo, isDemo, normalize } = require('../utils/helpers');
 const { rowAllowed } = require('../middleware/roleScope');
 
-const scopeRegion = (req) => req.user.role === 'superadmin' ? req.wilayahScope : req.user.wilayah;
+const scopeRegion = (req) => req.wilayahScope;
 const inScope = (req, rows) => {
   const region = scopeRegion(req);
   return region && region !== 'all' ? rows.filter((row) => normalize(row.wilayah) === normalize(region)) : rows;
@@ -63,14 +63,15 @@ exports.map = async (req, res, next) => {
     const account = accounts.find((row) => row.username.toLowerCase() === username.toLowerCase());
     if (!account) return res.status(404).json({ success: false, message: 'Username PPPoE tidak ditemukan pada sumber monitoring.' });
     if (account.customer_id && Number(account.customer_id) !== customerId) return res.status(409).json({ success: false, message: 'Username PPPoE sudah terhubung ke pelanggan lain.' });
-    if (account.wilayah && normalize(account.wilayah) !== normalize(req.user.role === 'superadmin' ? req.wilayahScope === 'all' ? account.wilayah : req.wilayahScope : req.user.wilayah)) {
+    const region = scopeRegion(req);
+    if (account.wilayah && region && region !== 'all' && normalize(account.wilayah) !== normalize(region)) {
       return res.status(422).json({ success: false, message: 'Akun PPPoE berasal dari wilayah lain.' });
     }
     if (isDemo()) {
       const customer = demo.customers.find((row) => row.id === customerId);
       const pppoe = demo.pppoe.find((row) => row.username.toLowerCase() === username.toLowerCase());
       if (!customer || !pppoe) return res.status(404).json({ success: false, message: 'Data tidak ditemukan.' });
-      if (!rowAllowed(req, customer.alamat) || (req.user.role !== 'superadmin' && normalize(pppoe.wilayah) !== normalize(req.user.wilayah))) return res.status(404).json({ success: false, message: 'Data tidak ditemukan.' });
+      if (!rowAllowed(req, customer.alamat) || (region && region !== 'all' && normalize(pppoe.wilayah) !== normalize(region))) return res.status(404).json({ success: false, message: 'Data tidak ditemukan.' });
       if (pppoe.wilayah && normalize(pppoe.wilayah) !== normalize(customer.alamat)) return res.status(422).json({ success: false, message: 'Akun PPPoE dan pelanggan harus berada pada wilayah yang sama.' });
       if (customer.pppoe_user && customer.pppoe_user.toLowerCase() !== username.toLowerCase()) return res.status(409).json({ success: false, message: 'Pelanggan sudah terhubung ke username PPPoE lain. Lepas mapping terlebih dahulu.' });
       const conflict = demo.customers.find((row) => row.id !== customerId && String(row.pppoe_user || '').toLowerCase() === username.toLowerCase());
@@ -147,8 +148,17 @@ exports.readonlyMapData = async (req, res, next) => {
   try {
     // Peta monitoring selalu membaca API PPPoE asli, termasuk saat Billing
     // memakai DEMO_MODE. Endpoint ini hanya melakukan HTTP GET.
+    const seenAccounts = new Set();
     const sourceAccounts = inScope(req, (await fetchPPPoESource())
-      .filter((account) => account.icon == null || Number(account.icon) === 119));
+      .filter((account) => account.icon == null || Number(account.icon) === 119)
+      .filter((account) => {
+        const username = String(account.username || account.user || '').trim().toLowerCase();
+        const key = username || String(account.id || account._id || '').trim().toLowerCase();
+        if (!key) return true;
+        if (seenAccounts.has(key)) return false;
+        seenAccounts.add(key);
+        return true;
+      }));
     const rows = [];
     let withoutCoordinates = 0;
 
@@ -182,6 +192,8 @@ exports.readonlyMapData = async (req, res, next) => {
         status: String(account.status || 'UNKNOWN').toUpperCase(),
       });
     }
+
+    rows.sort((a, b) => String(a.username || a.nama || '').localeCompare(String(b.username || b.nama || ''), 'id', { numeric: true, sensitivity: 'base' }));
 
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     return res.json({

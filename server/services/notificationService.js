@@ -28,13 +28,12 @@ async function createNotification(userId, payload) {
 
 async function notifyAdmins(wilayah, payload) {
   if (isDemo()) {
-    const recipients = demo.users.filter((user) => user.role === 'superadmin' || (user.role === 'admin' && user.wilayah === wilayah));
+    const recipients = demo.users.filter((user) => user.role === 'superadmin' || user.role === 'admin');
     for (const user of recipients) await createNotification(user.id, { ...payload, wilayah });
     return;
   }
   const [users] = await db.query(
-    "SELECT id FROM users WHERE status='aktif' AND (role='superadmin' OR (role='admin' AND wilayah=?))",
-    [wilayah],
+    "SELECT id FROM users WHERE status='aktif' AND role IN ('superadmin','admin')",
   );
   await Promise.all(users.map((user) => createNotification(user.id, { ...payload, wilayah })));
 }

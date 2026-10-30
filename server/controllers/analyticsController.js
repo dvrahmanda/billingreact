@@ -15,7 +15,7 @@ function lastPeriods(count = 6) {
 
 exports.index = async (req, res, next) => {
   try {
-    const region = req.user.role === 'superadmin' ? (req.wilayahScope && req.wilayahScope !== 'all' ? req.wilayahScope : null) : req.user.wilayah;
+    const region = req.wilayahScope && req.wilayahScope !== 'all' ? req.wilayahScope : null;
     const periods = lastPeriods();
     if (isDemo()) {
       const customers = demo.customers.filter((item) => !region || normalize(item.alamat) === normalize(region));

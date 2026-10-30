@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import api from '../services/api';
 
 const AuthContext = createContext(null);
+const WEB_ROLES = ['superadmin', 'admin', 'relawan'];
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -15,7 +16,7 @@ export function AuthProvider({ children }) {
     if (!token) { setLoading(false); return; }
     setLoading(true);
     api.get('/auth/me').then(({ data }) => {
-      if (!['superadmin', 'admin'].includes(data.data.role)) throw new Error('Akun ini menggunakan aplikasi mobile.');
+      if (!WEB_ROLES.includes(data.data.role)) throw new Error('Akun ini tidak memiliki akses ke dashboard web.');
       setUser(data.data);
       localStorage.setItem('billing_user', JSON.stringify(data.data));
     }).catch(() => {
@@ -29,7 +30,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/login', { username, password });
-      if (!['superadmin', 'admin'].includes(data.user?.role)) throw new Error('Gunakan aplikasi mobile Pelanggan atau Teknisi untuk akun ini.');
+      if (!WEB_ROLES.includes(data.user?.role)) throw new Error('Akun ini tidak memiliki akses ke dashboard web.');
       localStorage.setItem('billing_token', data.token);
       localStorage.setItem('billing_user', JSON.stringify(data.user));
       setUser(data.user);

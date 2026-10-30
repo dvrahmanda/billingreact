@@ -13,7 +13,7 @@ function demoJoined(complaint) {
 }
 
 function scopeRows(req, rows) {
-  const region = req.user.role === 'superadmin' ? req.wilayahScope : req.user.wilayah;
+  const region = req.wilayahScope;
   return region && region !== 'all' ? rows.filter((item) => normalize(item.alamat) === normalize(region)) : rows;
 }
 
@@ -46,7 +46,7 @@ exports.list = async (req, res, next) => {
     }
     const clauses = [];
     const params = [];
-    const region = req.user.role === 'superadmin' ? req.wilayahScope : req.user.wilayah;
+    const region = req.wilayahScope;
     if (region && region !== 'all') { clauses.push('p.alamat=?'); params.push(region); }
     if (req.query.status) { clauses.push('c.status=?'); params.push(req.query.status); }
     if (req.query.date_from) { clauses.push('c.created_at>=?'); params.push(`${req.query.date_from} 00:00:00`); }

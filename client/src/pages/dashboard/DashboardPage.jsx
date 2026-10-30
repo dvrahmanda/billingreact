@@ -5,7 +5,7 @@ import { apiGet } from '../../services/api';
 import Card from '../../components/common/Card';
 import Badge, { statusVariant } from '../../components/common/Badge';
 import DataTable from '../../components/common/DataTable';
-import { formatRupiah, labelStatus } from '../../utils/formatters';
+import { displayUserName, formatRupiah, labelStatus } from '../../utils/formatters';
 
 const REGIONS = ['BARAN', 'GUNUNGMANUK', 'NGASEMAYU', 'SALAM', 'TROSARI', 'WADUK'];
 
@@ -31,6 +31,7 @@ function SummaryCard({ icon: Icon, tone, category, value, label, details }) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const isRelawan = user?.role === 'relawan';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -69,7 +70,7 @@ export default function DashboardPage() {
     <div className="page-container dashboard-page">
       <section className="dashboard-hero">
         <div className="dashboard-hero-copy">
-          <h1>{user?.role === 'superadmin' ? 'Dashboard Super Admin' : `Dashboard ${user?.wilayah || ''}`}</h1>
+          <h1>{user?.role === 'superadmin' ? 'Dashboard Super Admin' : isRelawan ? `Dashboard ${displayUserName(user)}` : 'Dashboard Admin Wilayah'}</h1>
         </div>
         {user?.role === 'superadmin' && (
           <label className="dashboard-region-filter">
@@ -98,22 +99,26 @@ export default function DashboardPage() {
           value={Number(stats.belumLunas || 0).toLocaleString('id-ID')} label="Belum lunas"
           details={[{ label: 'Total tunggakan', value: formatRupiah(stats.totalTunggakan || 0), tone: 'warning' }]}
         />
-        <SummaryCard
+        {isRelawan ? <SummaryCard
+          icon={CircleDollarSign} tone="green" category="PEMBAYARAN"
+          value={formatRupiah(stats.totalPembayaran || 0)} label="Tercatat bulan ini"
+          details={[{ label: 'Tagihan lunas', value: stats.lunas || 0, tone: 'success' }]}
+        /> : <SummaryCard
           icon={Network} tone="green" category="JARINGAN PPPoE"
           value={Number(stats.pppoeOnline || 0).toLocaleString('id-ID')} label="Koneksi online"
           details={[{ label: 'Offline', value: stats.pppoeOffline || 0, tone: 'danger' }]}
-        />
-        <SummaryCard
+        />}
+        {!isRelawan && <SummaryCard
           icon={Headphones} tone="violet" category="GANGGUAN"
           value={Number(stats.complainAktif || 0).toLocaleString('id-ID')} label="Complain aktif"
           details={[
             { label: 'Baru', value: stats.complainBaru || 0, tone: 'warning' },
             { label: 'Teknisi bertugas', value: stats.teknisiBertugas || 0 },
           ]}
-        />
+        />}
       </section>
 
-      <section className="dashboard-details-grid">
+      <section className={'dashboard-details-grid' + (isRelawan ? ' dashboard-details-grid-relawan' : '')}>
         <Card title="Ringkasan pembayaran" className="dashboard-detail-card">
           <div className="dashboard-payment-content">
             <div className="dashboard-payment-figure">
@@ -129,19 +134,19 @@ export default function DashboardPage() {
           <div className="dashboard-progress-track"><span style={{ width: `${paymentProgress}%` }} /></div>
         </Card>
 
-        <Card title="Kondisi layanan" className="dashboard-detail-card">
+        {!isRelawan && <Card title="Kondisi layanan" className="dashboard-detail-card">
           <div className="dashboard-network-pair">
             <div className="dashboard-network-stat online"><span><Wifi size={15} /> Online</span><strong>{Number(stats.pppoeOnline || 0).toLocaleString('id-ID')} <small>koneksi</small></strong></div>
             <div className="dashboard-network-stat offline"><span><WifiOff size={15} /> Offline</span><strong>{Number(stats.pppoeOffline || 0).toLocaleString('id-ID')} <small>koneksi</small></strong></div>
           </div>
           <div className="dashboard-network-track"><span style={{ width: `${onlineShare}%` }} /></div>
           <div className="dashboard-service-foot"><span><Headphones size={14} /> {Number(stats.complainAktif || 0)} complain aktif</span><span><Wrench size={14} /> {Number(stats.teknisiBertugas || 0)} teknisi bertugas</span></div>
-        </Card>
+        </Card>}
       </section>
 
-      <Card title="Complain terbaru" className="dashboard-complaints-card">
+      {!isRelawan && <Card title="Complain terbaru" className="dashboard-complaints-card">
         <DataTable columns={columns} data={data?.recentComplaints || []} loading={loading && !data} emptyText="Belum ada complain aktif." />
-      </Card>
+      </Card>}
     </div>
   );
 }

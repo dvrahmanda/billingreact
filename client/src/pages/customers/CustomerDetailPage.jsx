@@ -7,12 +7,11 @@ import DataTable from '../../components/common/DataTable';
 import PrivateImage from '../../components/common/PrivateImage';
 import Button from '../../components/common/Button';
 import BackButton from '../../components/common/BackButton';
+import { useAuth } from '../../context/AuthContext';
 import { formatRupiah,formatDateIndo,labelStatus } from '../../utils/formatters';
 
-const tabs=['Profil','Tagihan','Riwayat Pembayaran','PPPoE','Complain','Foto / Dokumen'];
-
 export default function CustomerDetailPage(){
- const {id}=useParams();const[data,setData]=useState(null);const[active,setActive]=useState('Profil');const[error,setError]=useState('');const[uploading,setUploading]=useState(false);
+ const {id}=useParams();const{user}=useAuth();const isRelawan=user?.role==='relawan';const tabs=isRelawan?['Profil','Tagihan','Riwayat Pembayaran']:['Profil','Tagihan','Riwayat Pembayaran','PPPoE','Complain','Foto / Dokumen'];const[data,setData]=useState(null);const[active,setActive]=useState('Profil');const[error,setError]=useState('');const[uploading,setUploading]=useState(false);
  const load=()=>apiGet(`/customers/${id}`).then(r=>{setData(r.data);setError('')}).catch(e=>setError(e.friendlyMessage||'Data pelanggan gagal dimuat.'));
  useEffect(()=>{setData(null);load()},[id]);
  const uploadPhoto=async event=>{const file=event.target.files?.[0];if(!file)return;const form=new FormData();form.append('file',file);setUploading(true);try{await apiPost(`/customers/${id}/photo`,form);await load()}catch(e){alert(e.friendlyMessage||'Foto gagal diunggah.')}finally{setUploading(false);event.target.value=''}};

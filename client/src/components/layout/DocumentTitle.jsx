@@ -21,7 +21,7 @@ const PAGE_TITLES = [
   [/^\/management\/technicians\/?$/, 'Manajemen Teknisi'],
   [/^\/reports\/financial\/?$/, 'Laporan Keuangan'],
   [/^\/analytics\/?$/, 'Laporan dan Analisis'],
-  [/^\/management\/admins\/?$/, 'Admin Wilayah'],
+  [/^\/management\/admins\/?$/, 'Admin per Wilayah'],
   [/^\/activity\/?$/, 'Log Aktivitas'],
   [/^\/notifications\/?$/, 'Notifikasi'],
 ];

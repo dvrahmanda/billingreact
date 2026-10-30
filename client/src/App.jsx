@@ -30,7 +30,12 @@ import NotificationsPage from './pages/management/NotificationsPage';
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="screen-center"><div className="spinner" /></div>;
-  return user && ['superadmin', 'admin'].includes(user.role) ? children : <Navigate to="/login" replace />;
+  return user && ['superadmin', 'admin', 'relawan'].includes(user.role) ? children : <Navigate to="/login" replace />;
+}
+
+function AdminRoute({ children }) {
+  const { user } = useAuth();
+  return ['superadmin', 'admin'].includes(user?.role) ? children : <Navigate to="/dashboard" replace />;
 }
 
 function SuperAdminRoute({ children }) {
@@ -44,29 +49,29 @@ export default function App() {
     <>
       <DocumentTitle />
       <Routes>
-      <Route path="/login" element={user && ['superadmin', 'admin'].includes(user.role) ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+      <Route path="/login" element={user && ['superadmin', 'admin', 'relawan'].includes(user.role) ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
       <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="customers" element={<CustomerListPage />} />
-        <Route path="customers/new" element={<CustomerFormPage mode="create" />} />
-        <Route path="customers/:id/edit" element={<CustomerFormPage mode="edit" />} />
-        <Route path="customers/import" element={<CustomerImportPage />} />
+        <Route path="customers/new" element={<AdminRoute><CustomerFormPage mode="create" /></AdminRoute>} />
+        <Route path="customers/:id/edit" element={<AdminRoute><CustomerFormPage mode="edit" /></AdminRoute>} />
+        <Route path="customers/import" element={<AdminRoute><CustomerImportPage /></AdminRoute>} />
         <Route path="customers/:id" element={<CustomerDetailPage />} />
         <Route path="billings" element={<BillListPage />} />
         <Route path="billings/:id" element={<BillDetailPage />} />
         <Route path="payments" element={<PaymentHistoryPage />} />
-        <Route path="payments/matching" element={<PaymentMatchingPage />} />
-        <Route path="network/monitoring" element={<PPPoEMonitoringPage />} />
-        <Route path="network/mapping" element={<PPPoEMappingPage />} />
-        <Route path="network/map" element={<CustomerGeoMapPage />} />
-        <Route path="complaints" element={<ComplaintListPage />} />
-        <Route path="complaints/:id" element={<ComplaintDetailPage />} />
-        <Route path="technicians/monitoring" element={<TechnicianMonitoringPage />} />
+        <Route path="payments/matching" element={<AdminRoute><PaymentMatchingPage /></AdminRoute>} />
+        <Route path="network/monitoring" element={<AdminRoute><PPPoEMonitoringPage /></AdminRoute>} />
+        <Route path="network/mapping" element={<AdminRoute><PPPoEMappingPage /></AdminRoute>} />
+        <Route path="network/map" element={<AdminRoute><CustomerGeoMapPage /></AdminRoute>} />
+        <Route path="complaints" element={<AdminRoute><ComplaintListPage /></AdminRoute>} />
+        <Route path="complaints/:id" element={<AdminRoute><ComplaintDetailPage /></AdminRoute>} />
+        <Route path="technicians/monitoring" element={<AdminRoute><TechnicianMonitoringPage /></AdminRoute>} />
         <Route path="management/technicians" element={<SuperAdminRoute><TechnicianManagePage /></SuperAdminRoute>} />
-        <Route path="reports/financial" element={<FinancialReportPage />} />
-        <Route path="analytics" element={<AnalyticsPage />} />
-        <Route path="management/admins" element={<SuperAdminRoute><RegionalAdminPage /></SuperAdminRoute>} />
+        <Route path="reports/financial" element={<AdminRoute><FinancialReportPage /></AdminRoute>} />
+        <Route path="analytics" element={<AdminRoute><AnalyticsPage /></AdminRoute>} />
+        <Route path="management/admins" element={<AdminRoute><RegionalAdminPage /></AdminRoute>} />
         <Route path="activity" element={<SuperAdminRoute><ActivityPage /></SuperAdminRoute>} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="*" element={<NotFoundPage />} />

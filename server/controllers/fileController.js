@@ -1,14 +1,14 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const db = require('../config/database');
-const { demo, isDemo, normalize } = require('../utils/helpers');
+const { demo, isDemo, normalize, isOfficialRegion } = require('../utils/helpers');
 
 const folders = new Set(['bukti_transfer', 'foto_rumah', 'foto_complain', 'foto_penanganan']);
 const normalizedPath = (value) => String(value || '').replaceAll('\\', '/').replace(/^\//, '').replace(/^uploads\//, '');
 
 function mayRead(req, region, customerId, technicianId = null) {
   if (req.user.role === 'superadmin') return true;
-  if (req.user.role === 'admin') return normalize(req.user.wilayah) === normalize(region);
+  if (req.user.role === 'admin') return isOfficialRegion(region);
   if (req.user.role === 'pelanggan') return Number(req.user.pelanggan_id) === Number(customerId);
   if (req.user.role === 'teknisi') return Number(req.user.technician_id) === Number(technicianId);
   return false;

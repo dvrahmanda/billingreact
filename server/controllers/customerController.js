@@ -58,6 +58,42 @@ function customerFromDemo(customer) {
   return { ...customer, wilayah: customer.alamat, tanggal_aktif: customer.tanggal_daftar, foto_rumah: customer.foto_rumah || null };
 }
 
+function customerForRelawan(customer) {
+  return {
+    id: customer.id,
+    id_pelanggan: customer.id_pelanggan,
+    kode_pelanggan: customer.kode_pelanggan,
+    nama: customer.nama,
+    nomor_pelanggan: customer.nomor_pelanggan,
+    alamat: customer.alamat,
+    wilayah: customer.wilayah || customer.alamat,
+    alamat_lengkap: customer.alamat_lengkap,
+    paket: customer.paket,
+    tarif_langganan: customer.tarif_langganan,
+    tagihan: customer.tagihan,
+    status_bayar: customer.status_bayar,
+    status_pelanggan: customer.status_pelanggan,
+    tanggal_daftar: customer.tanggal_daftar,
+    tanggal_bayar: customer.tanggal_bayar,
+    nominal_dibayar: customer.nominal_dibayar,
+    nomor_invoice: customer.nomor_invoice,
+  };
+}
+
+function paymentForRelawan(payment) {
+  return {
+    id: payment.id,
+    order_id: payment.order_id,
+    periode: payment.periode,
+    tipe_pembayaran: payment.tipe_pembayaran,
+    metode: payment.metode,
+    nominal_tagihan: payment.nominal_tagihan,
+    nominal_dibayar: payment.nominal_dibayar,
+    status: payment.status,
+    created_at: payment.created_at,
+  };
+}
+
 async function customerPppoe(customer) {
   if (!customer?.pppoe_user) return {};
   try {
@@ -79,7 +115,8 @@ function listDemo(req) {
     if (q && !`${customer.nama} ${customer.id_pelanggan} ${customer.nomor_pelanggan || ''}`.toLowerCase().includes(q)) return false;
     return true;
   }).sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
-  const result = paginate(rows.map(customerFromDemo), req);
+  const mappedRows = rows.map(customerFromDemo);
+  const result = paginate(req.user.role === 'relawan' ? mappedRows.map(customerForRelawan) : mappedRows, req);
   return { success: true, ...result };
 }
 
@@ -107,7 +144,7 @@ exports.list = async (req, res, next) => {
        FROM pelanggan_salam p LEFT JOIN pelanggan_detail_salam d ON d.pelanggan_id=p.id ${where}
        ORDER BY p.nama LIMIT ? OFFSET ?`, [...values, pageSize, offset],
     );
-    return res.json({ success: true, data: rows, pagination: { page, page_size: pageSize, total: Number(count.total), pages: Math.ceil(Number(count.total) / pageSize) } });
+    return res.json({ success: true, data: req.user.role === 'relawan' ? rows.map(customerForRelawan) : rows, pagination: { page, page_size: pageSize, total: Number(count.total), pages: Math.ceil(Number(count.total) / pageSize) } });
   } catch (error) { return next(error); }
 };
 
@@ -116,6 +153,15 @@ exports.detail = async (req, res, next) => {
     if (isDemo()) {
       const customer = demo.customers.find((item) => item.id === Number(req.params.id));
       if (!customer || !rowAllowed(req, customer.alamat)) return res.status(404).json({ success: false, message: 'Pelanggan tidak ditemukan.' });
+      if (req.user.role === 'relawan') {
+        const bills = demo.bills.filter((item) => item.pelanggan_id === customer.id);
+        const payments = demo.payments.filter((item) => item.pelanggan_id === customer.id);
+        return res.json({ success: true, data: {
+          ...customerForRelawan(customerFromDemo(customer)),
+          tagihan_history: bills,
+          payment_history: payments.map(paymentForRelawan),
+        } });
+      }
       const complaints = demo.complaints.filter((item) => item.pelanggan_id === customer.id).map((item) => {
         const technician = demo.technicians.find((t) => t.id === item.teknisi_id);
         return { ...item, teknisi_nama: technician?.nama || null };
@@ -125,6 +171,21 @@ exports.detail = async (req, res, next) => {
         payment_history: demo.payments.filter((item) => item.pelanggan_id === customer.id), complaints,
         ...await customerPppoe(customer),
       } });
+    }
+    if (req.user.role === 'relawan') {
+      const [[customer]] = await db.query(
+        `SELECT p.id,p.id_pelanggan,p.kode_pelanggan,p.nama,p.nomor_pelanggan,p.alamat,p.alamat wilayah,
+                p.alamat_lengkap,p.paket,p.tarif_langganan,p.tagihan,p.status_bayar,p.status_pelanggan,
+                p.tanggal_daftar,p.tanggal_bayar,p.nominal_dibayar,p.nomor_invoice
+         FROM pelanggan_salam p WHERE p.id=?`, [req.params.id],
+      );
+      if (!customer || !rowAllowed(req, customer.alamat)) return res.status(404).json({ success: false, message: 'Pelanggan tidak ditemukan.' });
+      const [bills] = await db.query('SELECT * FROM tagihan_salam WHERE pelanggan_id=? ORDER BY periode DESC', [customer.id]);
+      const [payments] = await db.query(
+        'SELECT id,order_id,periode,tipe_pembayaran,metode,nominal_tagihan,nominal_dibayar,status,created_at FROM payments WHERE pelanggan_id=? ORDER BY created_at DESC',
+        [customer.id],
+      );
+      return res.json({ success: true, data: { ...customerForRelawan(customer), tagihan_history: bills, payment_history: payments } });
     }
     const [[customer]] = await db.query(
       `SELECT p.*,p.alamat wilayah,d.nama_ktp,d.nik,d.foto_rumah,d.koordinat_x,d.koordinat_y,d.pppoe_user,d.catatan
@@ -140,7 +201,7 @@ exports.detail = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const region = req.user.role === 'superadmin' ? null : req.user.wilayah;
+    const region = req.user.role === 'relawan' ? req.user.wilayah : null;
     const { body, errors } = validateCustomer(req.body, region);
     if (errors.length) return res.status(400).json({ success: false, message: errors.join(' ') });
     const mobileUsername = cleanString(req.body.username_mobile); const mobilePassword = String(req.body.password_mobile || '');
@@ -189,7 +250,7 @@ exports.update = async (req, res, next) => {
     if (isDemo()) existing = demo.customers.find((item) => item.id === id);
     else [[existing]] = await db.query('SELECT * FROM pelanggan_salam WHERE id=?', [id]);
     if (!existing || !rowAllowed(req, existing.alamat)) return res.status(404).json({ success: false, message: 'Pelanggan tidak ditemukan.' });
-    const region = req.user.role === 'superadmin' ? null : req.user.wilayah;
+    const region = req.user.role === 'relawan' ? req.user.wilayah : null;
     const { body, errors } = validateCustomer({ ...existing, ...req.body, id_pelanggan: existing.id_pelanggan }, region);
     if (errors.length) return res.status(400).json({ success: false, message: errors.join(' ') });
     if (isDemo()) {
@@ -259,7 +320,7 @@ exports.previewImport = async (req, res, next) => {
         record.wilayah = record.alamat_lengkap;
         record.alamat_lengkap = '';
       }
-      const validated = validateCustomer(record, req.user.role === 'superadmin' ? null : req.user.wilayah);
+      const validated = validateCustomer(record, req.user.role === 'relawan' ? req.user.wilayah : null);
       return { row_number: index + 2, values: validated.body, errors: validated.errors, status: validated.errors.length ? 'Error' : 'Valid' };
     }).filter((row) => Object.values(row.values).some((value) => value !== '' && value != null));
     const ids = new Set();
@@ -290,7 +351,7 @@ exports.previewImport = async (req, res, next) => {
 exports.importRows = async (req, res, next) => {
   try {
     if (!Array.isArray(req.body.rows) || req.body.rows.length > 1000) return res.status(400).json({ success: false, message: 'Kirim maksimal 1.000 baris valid untuk diimpor.' });
-    const region = req.user.role === 'superadmin' ? null : req.user.wilayah;
+    const region = req.user.role === 'relawan' ? req.user.wilayah : null;
     const candidates = req.body.rows.map((row) => validateCustomer(row, region));
     const invalid = candidates.filter((item) => item.errors.length);
     if (invalid.length) return res.status(400).json({ success: false, message: 'Sebagian data berubah atau tidak valid. Lakukan preview ulang.', errors: invalid.map((item) => item.errors) });

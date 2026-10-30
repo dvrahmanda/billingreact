@@ -1,5 +1,6 @@
 require('dotenv').config();
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
 const fs = require('node:fs');
 const { WILAYAH_RESMI } = require('../config/constants');
 
@@ -88,7 +89,7 @@ async function run() {
   const importableUsers = users.filter((row) => {
     const legacyRole = String(row.role || 'admin').toLowerCase();
     const region = normalizeRegion(row.wilayah) || customerRegionByUserId.get(Number(row.id)) || '';
-    return ['superadmin', 'admin', 'teknisi', 'pelanggan'].includes(legacyRole)
+    return ['superadmin', 'admin', 'relawan', 'teknisi', 'pelanggan'].includes(legacyRole)
       && (legacyRole === 'superadmin' || supportedRegions.has(region));
   });
   const userIds = new Set(importableUsers.map((row) => Number(row.id)));
@@ -103,7 +104,7 @@ async function run() {
     for (const row of importableUsers) {
       const legacyRole = String(row.role || 'admin').toLowerCase();
       const region = normalizeRegion(row.wilayah) || customerRegionByUserId.get(Number(row.id)) || '';
-      const role = legacyRole;
+      const role = legacyRole === 'admin' && row.username !== 'adminwilayahsalam' ? 'relawan' : legacyRole;
       const name = row.nama_lengkap || row.nama || row.username;
       await connection.query(
         `INSERT INTO users (id,username,password,role,wilayah,nama_lengkap,nomor_telepon,status,created_at)
@@ -112,6 +113,14 @@ async function run() {
           userColumns.has('nomor_telepon') ? row.nomor_telepon || null : null,
           userColumns.has('status') && ['aktif', 'nonaktif'].includes(String(row.status).toLowerCase()) ? String(row.status).toLowerCase() : 'aktif',
           row.created_at || new Date()],
+      );
+      copied.users += 1;
+    }
+
+    if (!importableUsers.some((row) => row.username === 'adminwilayahsalam')) {
+      await connection.query(
+        "INSERT INTO users (username,password,role,wilayah,nama_lengkap,status) VALUES (?,?,'admin','SALAM',?,'aktif')",
+        ['adminwilayahsalam', await bcrypt.hash('admin123', 10), 'Admin Wilayah Salam'],
       );
       copied.users += 1;
     }

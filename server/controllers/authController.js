@@ -47,7 +47,7 @@ exports.login = async (req, res, next) => {
     }
 
     user.role = String(user.role || '').trim().toLowerCase();
-    if (user.role === 'admin') user.wilayah = normalize(user.wilayah);
+    if (['admin', 'relawan'].includes(user.role)) user.wilayah = normalize(user.wilayah);
 
     if (user.role === 'pelanggan' && !user.pelanggan_id) {
       return res.status(403).json({ success: false, message: 'Akun pelanggan belum terhubung ke data pelanggan.' });
@@ -55,8 +55,8 @@ exports.login = async (req, res, next) => {
     if (user.role === 'teknisi' && !user.technician_id) {
       return res.status(403).json({ success: false, message: 'Akun teknisi belum terhubung ke data teknisi.' });
     }
-    if (user.role === 'admin' && !isOfficialRegion(user.wilayah)) {
-      return res.status(403).json({ success: false, message: 'Akun Admin Wilayah belum memiliki wilayah resmi.' });
+    if (['admin', 'relawan'].includes(user.role) && !isOfficialRegion(user.wilayah)) {
+      return res.status(403).json({ success: false, message: 'Akun wajib memiliki wilayah resmi.' });
     }
 
     const safeUser = {
